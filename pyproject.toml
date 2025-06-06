@@ -7,7 +7,7 @@ packages = ["juracoffeemachine"]
 
 [project]
 name = "juracoffeemachine"
-version = "0.0.1"
+version = "0.1.0"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -15,6 +15,7 @@ license = { file = "LICENSE" }
 description = "Controls a Jura E6"
 authors = [{ name = "Seb-sti1", email = "noreply@kerbourch.fr" }]
 dependencies = [
+    "pyserial==3.5"
 ]
 
 

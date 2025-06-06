@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 from enum import StrEnum
-from typing import List
+from typing import List, Optional
 
 import serial
 
@@ -119,8 +119,7 @@ class JuraProtocol:
         self.actionLock.acquire()
         try:
             for c in data:
-                encoded = self.encode(ord(c))
-                written = self.__serial__.write(bytes(encoded))
+                written = self.__serial__.write(bytes(self.encode(ord(c))))
                 self.__serial__.flush()
                 time.sleep(0.008)
                 if written != 4:
@@ -129,19 +128,24 @@ class JuraProtocol:
         finally:
             self.actionLock.release()
 
-    def read_decoded(self, timeout: float) -> str:
+    def read_decoded(self, end_separator: str = "\r\n",
+                     timeout: float = 1.5, wait: float = 0.25) -> str:
+        self.actionLock.acquire()
+        result = []
         start = time.time()
-        while timeout <= 0 or (time.time() - start) < timeout:
+        while timeout <= 0 or "".join(result).endswith(end_separator) or (time.time() - start) < timeout:
             buffer = self.__serial__.read(4)
             if len(buffer) == 4:
                 decoded = self.decode(list(buffer))
-                return chr(decoded)
-            time.sleep(0.25)
-        return ""
+                result.append(chr(decoded))
+            else:
+                time.sleep(wait)
+        self.actionLock.release()
+        return "".join(result).strip()
 
-    def write_decoded_with_response(self, data: str, timeout: float) -> str | None:
+    def write_decoded_with_response(self, data: str, timeout: float = 1.5) -> Optional[str]:
         if self.write_decoded(data):
-            return self.read_decoded(timeout)
+            return self.read_decoded(timeout=timeout)
         return None
 
 
@@ -151,13 +155,6 @@ class JuraCommand(StrEnum):
     TEST_MODE_OFF = "AN:21\r\n"
 
     GET_TYPE = "TY:\r\n"
-
-    BUTTON_1 = "FA:04\r\n"
-    BUTTON_2 = "FA:05\r\n"
-    BUTTON_3 = "FA:06\r\n"
-    BUTTON_4 = "FA:07\r\n"
-    BUTTON_5 = "FA:08\r\n"
-    BUTTON_6 = "FA:09\r\n"
 
     BREW_GROUP_TO_BREWING_POSITION = "FN:22\r\n"
     BREW_GROUP_RESET = "FN:0D\r\n"
