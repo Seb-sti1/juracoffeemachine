@@ -42,8 +42,8 @@ class CoffeeMaker:
         self.connection.write_decoded(command)
         result = self.connection.read_decoded()
         if result == "ok:":
-            logger.error(f"Receive wrong acknowledgement {result}")
             return True
+        logger.error(f"Receive wrong acknowledgement {result}")
         return False
 
     def brew_coffee(self, coffee: CoffeeType):

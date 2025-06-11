@@ -41,7 +41,7 @@ def main():
 
     while True:
         result = machin.connection.read_decoded()
-        logger.info(f"Response: {result}\n")
+        logger.info(f"Response: {result}")
 
 
 if __name__ == "__main__":
