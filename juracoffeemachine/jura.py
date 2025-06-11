@@ -133,7 +133,7 @@ class JuraProtocol:
         self.actionLock.acquire()
         result = []
         start = time.time()
-        while timeout <= 0 or "".join(result).endswith(end_separator) or (time.time() - start) < timeout:
+        while not "".join(result).endswith(end_separator) and (time.time() - start) < timeout:
             buffer = self.__serial__.read(4)
             if len(buffer) == 4:
                 decoded = self.decode(list(buffer))
