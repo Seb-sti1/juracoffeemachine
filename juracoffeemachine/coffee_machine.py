@@ -36,8 +36,6 @@ class CoffeeMaker:
         logger.info(f"Response: {response}")
         # assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
 
-        self.connection.write_decoded(JuraCommand.DEBUG)
-
     def __send_command_and_wait_for_acknowledgement__(self, command: str):
         self.connection.write_decoded(command)
         result = self.connection.read_decoded()
