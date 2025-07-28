@@ -33,8 +33,9 @@ class CoffeeMaker:
         self.connection = protocol
 
         response = self.connection.write_decoded_with_response(JuraCommand.GET_TYPE, 1.0)
-        logger.info(f"Response: {response}")
-        # assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
+        assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
+        response = self.connection.write_decoded_with_response(JuraCommand.GET_LOADER, 1.0)
+        assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
 
     def __send_command_and_wait_for_acknowledgement__(self, command: str):
         self.connection.write_decoded(command)
