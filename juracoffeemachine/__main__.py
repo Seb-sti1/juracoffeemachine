@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 
 from juracoffeemachine.coffee_machine import CoffeeMaker
 from juracoffeemachine.jura import JuraProtocol
@@ -31,7 +32,10 @@ def main():
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable debug output')
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO)
+    fmt = logging.Formatter("%(levelname)s:%(asctime)s:%(name)s:%(message)s", datefmt='%Y-%m-%d %H:%M:%S')
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(fmt)
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, handlers=[console_handler])
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     machin = CoffeeMaker(JuraProtocol(args.port))
