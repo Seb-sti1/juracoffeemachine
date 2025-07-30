@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os.path
 import sys
 
 from juracoffeemachine.coffee_machine import CoffeeMaker
@@ -24,7 +25,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, handlers=[console_handler])
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    machin = CoffeeMaker(JuraProtocol(args.port))
+    machin = CoffeeMaker(JuraProtocol(args.port, lambda b: b.dump(os.path.join(__path__, str(int(time.time()))))))
     machin.brew_coffee(machin.CoffeeType.COFFEE)
 
 

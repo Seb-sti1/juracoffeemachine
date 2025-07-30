@@ -2,18 +2,56 @@ import logging
 import threading
 import time
 from enum import StrEnum
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Tuple, Callable
 
 import serial
 
 logger = logging.getLogger(__name__)
 
 
-class JuraSerial:
-    def __init__(self, device: str):
+class CircularBuffer:
+    def __init__(self, size: int):
+        self.size = size
+        self.buffer: list[Tuple[bool, str]] = []
+
+    def append(self, is_write: bool, data: bytes):
+        self.buffer.append((is_write, data.hex()))
+        if len(self.buffer) > self.size:
+            self.buffer = self.buffer[1:]
+
+    def dump(self, path: Path):
+        f = path.open("r")
+        f.write('\n'.join(map(lambda e: f"{e[0]}, {e[1]}", self.buffer)))
+
+
+class AbstractSerial:
+    def __init__(self):
+        pass
+
+    def get_debug_buffer(self) -> CircularBuffer:
+        raise NotImplemented("This is an abstract method")
+
+    def close(self):
+        raise NotImplemented("This is an abstract method")
+
+    def read(self, size=4) -> bytes:
+        raise NotImplemented("This is an abstract method")
+
+    def write(self, data: bytes) -> int:
+        raise NotImplemented("This is an abstract method")
+
+    def flush(self):
+        raise NotImplemented("This is an abstract method")
+
+
+class JuraSerial(AbstractSerial):
+    def __init__(self, device: str, circular_debug_buffer_size: int = 5000):
+        super().__init__()
         self.device = device
         self.__serial__ = serial.Serial()
         self.__open_serial__()
+        self.buffer = CircularBuffer(circular_debug_buffer_size)
 
     def __open_serial__(self):
         try:
@@ -34,6 +72,9 @@ class JuraSerial:
             logger.error(f"Failed to open or configure '{self.device}': {e}")
             raise RuntimeError(f"Failed to open or configure '{self.device}': {e}")
 
+    def get_debug_buffer(self) -> CircularBuffer:
+        return self.buffer
+
     def close(self):
         if self.__serial__.is_open:
             self.__serial__.close()
@@ -43,14 +84,14 @@ class JuraSerial:
         if not self.__serial__.is_open:
             raise RuntimeError("Serial port not open")
         data = self.__serial__.read(size)
-        logger.debug(f"Read {len(data)} bytes: {data.hex()}")
+        self.buffer.append(False, data)
         return data
 
     def write(self, data: bytes) -> int:
         if not self.__serial__.is_open:
             raise RuntimeError("Serial port not open")
         count = self.__serial__.write(data)
-        logger.debug(f"Wrote {count} bytes: {data.hex()}")
+        self.buffer.append(True, data)
         return count
 
     def flush(self):
@@ -59,9 +100,10 @@ class JuraSerial:
 
 
 class JuraProtocol:
-    def __init__(self, device: str):
+    def __init__(self, device: str, unexpected_msg_callback: Callable[[CircularBuffer], None]):
         self.__serial__ = JuraSerial(device)
         self.actionLock = threading.Lock()
+        self.unexpected_msg_callback = unexpected_msg_callback
 
     @staticmethod
     def encode(dec_data: int) -> List[int]:
