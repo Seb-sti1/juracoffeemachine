@@ -2,9 +2,10 @@ import argparse
 import logging
 import os.path
 import sys
+import time
 
 from juracoffeemachine.coffee_machine import CoffeeMaker
-from juracoffeemachine.jura import JuraProtocol
+from juracoffeemachine.jura import JuraProtocol, JuraCommand
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,20 @@ def main():
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     machin = CoffeeMaker(JuraProtocol(args.port, lambda b: b.dump(os.path.join(__path__, str(int(time.time()))))))
-    machin.brew_coffee(machin.CoffeeType.COFFEE)
+    machin.brew_coffee(machin.CoffeeType.COFFEE, machin.coffee_bean_param[1], machin.water_volume_param[1])
 
 
-    while True:
-        result = machin.connection.read_decoded()
-        logger.info(f"Response: {result}")
+    if False:
+        cmd = JuraCommand.CS
+        # cmd = JuraCommand.HZ
+        while True:
+            print(f"{','.join([str(i).ljust(5) for i in machin.connection.get_and_parse_message(cmd)])}")
+            time.sleep(0.4)
+    else:
+        with open(f"./{int(time.time())}.dump", "wb") as f:
+            eeprom = machin.connection.dump_eeprom()
+            data = int(eeprom, 16)
+            f.write(data.to_bytes(len(eeprom) // 2))
 
 
 if __name__ == "__main__":
