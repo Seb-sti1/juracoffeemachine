@@ -1,4 +1,5 @@
 import logging
+import re
 import threading
 import time
 from enum import StrEnum
@@ -126,10 +127,87 @@ class JuraSerial(AbstractSerial):
 
 
 class JuraProtocol:
+    FORMAT_REGEX = {
+        JuraCommand.HZ: r"hz:..............,....,....,....,....,....,.,....,......,..",
+        JuraCommand.CS: r"cs:...........................................",
+        JuraCommand.IC: r"ic:....",
+    }
+
+    # Extracted groups are indicated by - or . in examples
+    GROUP_REGEX = {
+        # hz:.10-0-.000.000,0288,....,....,....,0000,0,....,0.0.-.,12
+        # hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12
+        # UNKNOWNA: first seen will cleaning
+        # BOWL_MOVING: flag active at the same time as the coffee bowl moves
+        # SLEEPING (extremely probable): 0 = turn on, 1 = sleeping mode
+        # BOWL_POS (extremely probable): the position of the bowl containing the grounded coffee
+        # WATER_VOL (extremely probable): value*0,4577 ~= water volume in ml
+        # HEATER (extremely probable): the value of the heater of the machine
+        # WATER_TANK (extremely probable): 0 = water tank present, 1 = water tank absent
+        # COFFEE_WASTE (probable): 0 = waste tank full, 1 = waste tank not full
+        # DRAINING_TRAY (probable): 0 = draining tray present, 1 = draining tray absent
+        # DRAINING_TRAY_FULL (probable): 0 = draining tray not full, 1 = draining tray full
+        JuraCommand.HZ: r"^hz:(?P<SLEEPING>.)10(?P<UNKNOWNA>.)0(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)000(?P<UNKNOWNC>.)000,"
+                        r"0288,(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),0000,0,(?P<UNKNOWNE>....),"
+                        r"0(?P<WATER_TANK>.)0(?P<COFFEE_WASTE>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),12$",
+        # cs:....00000....---000...---0..000....00...---
+        # cs:03770000000ED000000000000006000011C00000000
+        # HEATER (extremely probable): the value of the heater of the machine
+        # BOWL_POS_2 (unsure): variation are the same as BOWL_POS but maximum value seems different
+        # UNKNOWNB: 0-1023, close to UNKNOWNG + UNKNOWNH
+        # UNKNOWNF: 0-1023, seen while getting hot water
+        # UNKNOWNG: 0-1023, seems very synchronised with WATER_VOL
+        # UNKNOWNH: between 0-1023 just before the BOWL_POS moves, could be when grinding coffee beans
+        # UNKNOWNI: 6 all the time except after the water finished then 176
+        # WATER_VOL (extremely probable): value*0,4577 ~= water volume in ml
+        # UNKNOWNK: 0-1023, just before water start flowing and smaller value at the very end
+        # UNKNOWNL: 0-1023, at the very end
+        JuraCommand.CS: r"^cs:(?P<HEATER>....)00000(?P<BOWL_POS_2>....)(?P<UNKNOWNB>...)(?P<UNKNOWNF>...)"
+                        r"(?P<UNKNOWNG>...)(?P<UNKNOWNH>...)0(?P<UNKNOWNI>..)000(?P<WATER_VOL>....)00"
+                        r"(?P<UNKNOWNK>...)(?P<UNKNOWNL>...)$",
+        # UNKNOWNM: seems an aggregate of multiple value. maybe a OR of multiple flags converted into an int.
+        JuraCommand.IC: r"ic:(?P<UNKNOWNM>....)",
+    }
+
     def __init__(self, device: str, unexpected_msg_callback: Callable[[CircularBuffer], None]):
         self.__serial__ = JuraSerial(device)
         self.actionLock = threading.Lock()
         self.unexpected_msg_callback = unexpected_msg_callback
+
+    def get_raw(self, command: JuraCommand) -> Optional[str]:
+        return self.write_with_response(command)
+
+    def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[list[int]]:
+        raw = raw if raw is not None else self.get_raw(command)
+        if raw is None:
+            return None
+        m = re.match(JuraProtocol.GROUP_REGEX[command], raw)
+        if m:
+            return list(map(lambda t: int(t, 16), m.groups()))
+        else:
+            logger.warning(f"Received an unexpected message value {raw}.")
+            self.unexpected_msg_callback(self.__serial__.get_debug_buffer())
+            return None
+
+    def dump_eeprom(self):
+        mem = ""
+        address = 0
+        while address < 0x400:
+            cmd = f"RT:{hex(address)[2:].rjust(4).replace(' ', '0').upper()}\r\n"
+            r = self.write_with_response(cmd)
+            logger.debug(f"{cmd.strip()} -> {r}")
+            if ":" in r:
+                mem += r.split(":")[-1]
+            else:
+                logger.warning(f"Error while fetching {cmd}...")
+            address += 16
+        return mem
+
+    def dump_eeprom_to_file(self, path: Path):
+        with open(path, "wb") as f:
+            eeprom = self.dump_eeprom()
+            data = int(eeprom, 16)
+            f.write(data.to_bytes(len(eeprom) // 2))
 
     @staticmethod
     def encode(dec_data: int) -> List[int]:
@@ -196,7 +274,7 @@ class JuraProtocol:
         finally:
             self.actionLock.release()
 
-    def read(self, end_separator: str = "\r\n", timeout: float = 1.5, wait: float = 0.25) -> str:
+    def read(self, end_separator: str = "\r\n", timeout: float = 3, wait: float = 0.5) -> str:
         self.actionLock.acquire()
         result = []
         start = time.time()
@@ -206,11 +284,12 @@ class JuraProtocol:
                 decoded = self.decode(list(buffer))
                 result.append(chr(decoded))
             else:
+                logger.warning(f"Returned too small buffer ({len(buffer)})")
                 time.sleep(wait)
         self.actionLock.release()
         return "".join(result).strip()
 
-    def write_with_response(self, data: str, timeout: float = 1.5) -> Optional[str]:
+    def write_with_response(self, data: str, timeout: float = 3) -> Optional[str]:
         if self.write(data):
             return self.read(timeout=timeout)
         return None
