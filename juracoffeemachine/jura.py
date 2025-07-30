@@ -10,6 +10,32 @@ import serial
 logger = logging.getLogger(__name__)
 
 
+class JuraCommand(StrEnum):
+    POWER_OFF = "AN:01\r\n"
+    TEST_MODE_ON = "AN:20\r\n"
+    TEST_MODE_OFF = "AN:21\r\n"
+
+    GET_TYPE = "TY:\r\n"
+    GET_LOADER = "TL:\r\n"
+
+    BREW_GROUP_TO_BREWING_POSITION = "FN:22\r\n"
+    BREW_GROUP_RESET = "FN:0D\r\n"
+
+    GRINDER_ON = "FN:07\r\n"
+    GRINDER_OFF = "FN:08\r\n"
+    COFFEE_PRESS_ON = "FN:0B\r\n"
+    COFFEE_PRESS_OFF = "FN:0C\r\n"
+    COFFEE_WATER_HEATER_ON = "FN:03\r\n"
+    COFFEE_WATER_HEATER_OFF = "FN:04\r\n"
+    COFFEE_WATER_PUMP_ON = "FN:01\r\n"
+    COFFEE_WATER_PUMP_OFF = "FN:02\r\n"
+
+    CS = "CS:\r\n"
+    HZ = "HZ:\r\n"
+    IC = "IC:\r\n"
+    DEBUG = "FN:89\r\n"
+
+
 class CircularBuffer:
     def __init__(self, size: int):
         self.size = size
@@ -189,25 +215,3 @@ class JuraProtocol:
         if self.write_decoded(data):
             return self.read_decoded(timeout=timeout)
         return None
-
-
-class JuraCommand(StrEnum):
-    POWER_OFF = "AN:01\r\n"
-    TEST_MODE_ON = "AN:20\r\n"
-    TEST_MODE_OFF = "AN:21\r\n"
-
-    GET_TYPE = "TY:\r\n"
-
-    BREW_GROUP_TO_BREWING_POSITION = "FN:22\r\n"
-    BREW_GROUP_RESET = "FN:0D\r\n"
-
-    GRINDER_ON = "FN:07\r\n"
-    GRINDER_OFF = "FN:08\r\n"
-    COFFEE_PRESS_ON = "FN:0B\r\n"
-    COFFEE_PRESS_OFF = "FN:0C\r\n"
-    COFFEE_WATER_HEATER_ON = "FN:03\r\n"
-    COFFEE_WATER_HEATER_OFF = "FN:04\r\n"
-    COFFEE_WATER_PUMP_ON = "FN:01\r\n"
-    COFFEE_WATER_PUMP_OFF = "FN:02\r\n"
-
-    DEBUG = "FN:89\r\n"
