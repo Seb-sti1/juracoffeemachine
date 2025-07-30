@@ -183,7 +183,7 @@ class JuraProtocol:
 
         return dec_data
 
-    def write_decoded(self, data: str) -> bool:
+    def write(self, data: str) -> bool:
         self.actionLock.acquire()
         try:
             for c in data:
@@ -196,8 +196,7 @@ class JuraProtocol:
         finally:
             self.actionLock.release()
 
-    def read_decoded(self, end_separator: str = "\r\n",
-                     timeout: float = 1.5, wait: float = 0.25) -> str:
+    def read(self, end_separator: str = "\r\n", timeout: float = 1.5, wait: float = 0.25) -> str:
         self.actionLock.acquire()
         result = []
         start = time.time()
@@ -211,7 +210,7 @@ class JuraProtocol:
         self.actionLock.release()
         return "".join(result).strip()
 
-    def write_decoded_with_response(self, data: str, timeout: float = 1.5) -> Optional[str]:
-        if self.write_decoded(data):
-            return self.read_decoded(timeout=timeout)
+    def write_with_response(self, data: str, timeout: float = 1.5) -> Optional[str]:
+        if self.write(data):
+            return self.read(timeout=timeout)
         return None

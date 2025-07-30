@@ -32,14 +32,14 @@ class CoffeeMaker:
     def __init__(self, protocol: JuraProtocol):
         self.connection = protocol
 
-        response = self.connection.write_decoded_with_response(JuraCommand.GET_TYPE, 1.0)
+        response = self.connection.write_with_response(JuraCommand.GET_TYPE, 1.0)
         assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
-        response = self.connection.write_decoded_with_response(JuraCommand.GET_LOADER, 1.0)
+        response = self.connection.write_with_response(JuraCommand.GET_LOADER, 1.0)
         assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
 
     def __send_command_and_wait_for_acknowledgement__(self, command: str):
-        self.connection.write_decoded(command)
-        result = self.connection.read_decoded()
+        self.connection.write(command)
+        result = self.connection.read()
         if result == "ok:":
             return True
         logger.error(f"Receive wrong acknowledgement {result}")
@@ -49,10 +49,10 @@ class CoffeeMaker:
         self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[coffee])
 
     def less(self):
-        self.connection.write_decoded(CoffeeMaker.JuraButton.BUTTON_2)
+        self.connection.write(CoffeeMaker.JuraButton.BUTTON_2)
 
     def more(self):
-        self.connection.write_decoded(CoffeeMaker.JuraButton.BUTTON_5)
+        self.connection.write(CoffeeMaker.JuraButton.BUTTON_5)
 
     def stop(self):
-        self.connection.write_decoded(CoffeeMaker.JuraButton.BUTTON_6)
+        self.connection.write(CoffeeMaker.JuraButton.BUTTON_6)
