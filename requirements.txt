@@ -1,2 +1,4 @@
-pynput
 pyserial
+pytest
+coverage
+build
