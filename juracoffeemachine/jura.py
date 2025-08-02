@@ -1,12 +1,13 @@
 import logging
-import re
 import threading
 import time
 from enum import StrEnum
 from pathlib import Path
-from typing import List, Optional, Tuple, Callable
+from typing import List, Optional, Tuple, Callable, overload
 
 import serial
+
+from juracoffeemachine.response import HZ, CS, IC, Response
 
 logger = logging.getLogger(__name__)
 
@@ -138,46 +139,10 @@ class JuraSerial(AbstractSerial):
 
 
 class JuraProtocol:
-    FORMAT_REGEX = {
-        JuraCommand.HZ: r"hz:..............,....,....,....,....,....,.,....,......,..",
-        JuraCommand.CS: r"cs:...........................................",
-        JuraCommand.IC: r"ic:....",
-    }
-
-    # Extracted groups are indicated by - or . in examples
-    GROUP_REGEX = {
-        # hz:.10-0-.000.000,0288,....,....,....,0000,0,....,0.0.-.,12
-        # hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12
-        # UNKNOWNA: first seen will cleaning
-        # BOWL_MOVING: flag active at the same time as the coffee bowl moves
-        # SLEEPING (extremely probable): 0 = turn on, 1 = sleeping mode
-        # BOWL_POS (extremely probable): the position of the bowl containing the grounded coffee
-        # WATER_VOL (extremely probable): value*0,4577 ~= water volume in ml
-        # HEATER (extremely probable): the value of the heater of the machine
-        # WATER_TANK (extremely probable): 0 = water tank present, 1 = water tank absent
-        # COFFEE_WASTE (probable): 0 = waste tank full, 1 = waste tank not full
-        # DRAINING_TRAY (probable): 0 = draining tray present, 1 = draining tray absent
-        # DRAINING_TRAY_FULL (probable): 0 = draining tray not full, 1 = draining tray full
-        JuraCommand.HZ: r"^hz:(?P<SLEEPING>.)10(?P<UNKNOWNA>.)0(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)000(?P<UNKNOWNC>.)000,"
-                        r"0288,(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),0000,0,(?P<UNKNOWNE>....),"
-                        r"0(?P<WATER_TANK>.)0(?P<COFFEE_WASTE>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),12$",
-        # cs:....00000....---000...---0..000....00...---
-        # cs:03770000000ED000000000000006000011C00000000
-        # HEATER (extremely probable): the value of the heater of the machine
-        # BOWL_POS_2 (unsure): variation are the same as BOWL_POS but maximum value seems different
-        # UNKNOWNB: 0-1023, close to UNKNOWNG + UNKNOWNH
-        # UNKNOWNF: 0-1023, seen while getting hot water
-        # UNKNOWNG: 0-1023, seems very synchronised with WATER_VOL
-        # UNKNOWNH: between 0-1023 just before the BOWL_POS moves, could be when grinding coffee beans
-        # UNKNOWNI: 6 all the time except after the water finished then 176
-        # WATER_VOL (extremely probable): value*0,4577 ~= water volume in ml
-        # UNKNOWNK: 0-1023, just before water start flowing and smaller value at the very end
-        # UNKNOWNL: 0-1023, at the very end
-        JuraCommand.CS: r"^cs:(?P<HEATER>....)00000(?P<BOWL_POS_2>....)(?P<UNKNOWNB>...)(?P<UNKNOWNF>...)"
-                        r"(?P<UNKNOWNG>...)(?P<UNKNOWNH>...)0(?P<UNKNOWNI>..)000(?P<WATER_VOL>....)00"
-                        r"(?P<UNKNOWNK>...)(?P<UNKNOWNL>...)$",
-        # UNKNOWNM: seems an aggregate of multiple value. maybe a OR of multiple flags converted into an int.
-        JuraCommand.IC: r"ic:(?P<UNKNOWNM>....)",
+    RESPONSE = {
+        JuraCommand.HZ: HZ,
+        JuraCommand.CS: CS,
+        JuraCommand.IC: IC,
     }
 
     def __init__(self, device: str, unexpected_msg_callback: Callable[[CircularBuffer], None]):
@@ -188,15 +153,30 @@ class JuraProtocol:
     def get_raw(self, command: JuraCommand) -> Optional[str]:
         return self.write_with_response(command)
 
-    def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[list[int]]:
+    @overload
+    def get_and_parse_message(self, command: JuraCommand.HZ, raw: Optional[str] = None) -> Optional[HZ]:
+        ...
+
+    @overload
+    def get_and_parse_message(self, command: JuraCommand.CS, raw: Optional[str] = None) -> Optional[CS]:
+        ...
+
+    @overload
+    def get_and_parse_message(self, command: JuraCommand.IC, raw: Optional[str] = None) -> Optional[IC]:
+        ...
+
+    def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
         raw = raw if raw is not None else self.get_raw(command)
         if raw is None:
             return None
-        m = re.match(JuraProtocol.GROUP_REGEX[command], raw)
-        if m:
-            return list(map(lambda t: int(t, 16), m.groups()))
+
+        if JuraProtocol.RESPONSE[command].check_format(raw):
+            if not JuraProtocol.RESPONSE[command].check_static(raw):
+                logger.fatal(f"Unexpected value changed '{raw}'.")
+                self.unexpected_msg_callback(self.__serial__.get_debug_buffer())
+            return JuraProtocol.RESPONSE[command](raw)
         else:
-            logger.warning(f"Received an unexpected message value {raw}.")
+            logger.fatal(f"Message does not respect format '{raw}'.")
             self.unexpected_msg_callback(self.__serial__.get_debug_buffer())
             return None
 
