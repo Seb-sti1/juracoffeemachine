@@ -12,29 +12,40 @@ logger = logging.getLogger(__name__)
 
 
 class JuraCommand(StrEnum):
-    POWER_OFF = "AN:01\r\n"
-    TEST_MODE_ON = "AN:20\r\n"
-    TEST_MODE_OFF = "AN:21\r\n"
+    POWER_OFF = "AN:01"
+    TEST_MODE_ON = "AN:20"
+    TEST_MODE_OFF = "AN:21"
+    DEBUG = "FN:89"
 
-    GET_TYPE = "TY:\r\n"
-    GET_LOADER = "TL:\r\n"
+    GET_TYPE = "TY:"
+    GET_LOADER = "TL:"
 
-    BREW_GROUP_TO_BREWING_POSITION = "FN:22\r\n"
-    BREW_GROUP_RESET = "FN:0D\r\n"
+    BREW_GROUP_TO_BREWING_POSITION = "FN:22"
+    BREW_GROUP_RESET = "FN:0D"
 
-    GRINDER_ON = "FN:07\r\n"
-    GRINDER_OFF = "FN:08\r\n"
-    COFFEE_PRESS_ON = "FN:0B\r\n"
-    COFFEE_PRESS_OFF = "FN:0C\r\n"
-    COFFEE_WATER_HEATER_ON = "FN:03\r\n"
-    COFFEE_WATER_HEATER_OFF = "FN:04\r\n"
-    COFFEE_WATER_PUMP_ON = "FN:01\r\n"
-    COFFEE_WATER_PUMP_OFF = "FN:02\r\n"
+    GRINDER_ON = "FN:07"
+    GRINDER_OFF = "FN:08"
+    COFFEE_PRESS_ON = "FN:0B"
+    COFFEE_PRESS_OFF = "FN:0C"
+    COFFEE_WATER_HEATER_ON = "FN:03"
+    COFFEE_WATER_HEATER_OFF = "FN:04"
+    COFFEE_WATER_PUMP_ON = "FN:01"
+    COFFEE_WATER_PUMP_OFF = "FN:02"
 
-    CS = "CS:\r\n"
-    HZ = "HZ:\r\n"
-    IC = "IC:\r\n"
-    DEBUG = "FN:89\r\n"
+    BUTTON_1 = "FA:04"
+    BUTTON_2 = "FA:05"
+    BUTTON_3 = "FA:06"
+    BUTTON_4 = "FA:07"
+    BUTTON_5 = "FA:08"
+    BUTTON_6 = "FA:09"
+
+    # read from eeprom. address is 2 bytes hex in uppercase. last address is 0x3FF.
+    RE = "RE:"  # read 2 bytes from eeprom
+    RT = "RT:"  # read 32 bytes from eeprom
+
+    CS = "CS:"
+    HZ = "HZ:"
+    IC = "IC:"
 
 
 class CircularBuffer:
@@ -189,17 +200,19 @@ class JuraProtocol:
             self.unexpected_msg_callback(self.__serial__.get_debug_buffer())
             return None
 
-    def dump_eeprom(self):
+    def read_eeprom(self, address: str, use_rt: bool = False) -> str:
+        cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}:{address.upper()}"
+        r = self.write_with_response(cmd)
+        return r.split(":")[-1]
+
+    def dump_eeprom(self) -> str:
         mem = ""
         address = 0
         while address < 0x400:
-            cmd = f"RT:{hex(address)[2:].rjust(4).replace(' ', '0').upper()}\r\n"
-            r = self.write_with_response(cmd)
-            logger.debug(f"{cmd.strip()} -> {r}")
-            if ":" in r:
-                mem += r.split(":")[-1]
-            else:
-                logger.warning(f"Error while fetching {cmd}...")
+            a = hex(address)[2:].rjust(4).replace(' ', '0')
+            r = self.read_eeprom(a, True)
+            logger.debug(f"{a} -> {r}")
+            mem += r
             address += 16
         return mem
 
@@ -261,10 +274,10 @@ class JuraProtocol:
 
         return dec_data
 
-    def write(self, data: str) -> bool:
+    def write(self, data: str, end_separator: str = "\r\n") -> bool:
         self.actionLock.acquire()
         try:
-            for c in data:
+            for c in data + end_separator:
                 written = self.__serial__.write(bytes(self.encode(ord(c))))
                 self.__serial__.flush()
                 time.sleep(0.008)

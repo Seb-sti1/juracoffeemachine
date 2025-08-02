@@ -1,6 +1,6 @@
 import logging
 import time
-from enum import IntEnum, StrEnum
+from enum import IntEnum
 
 from juracoffeemachine.jura import JuraProtocol, JuraCommand
 
@@ -14,20 +14,12 @@ class CoffeeMaker:
         COFFEE = 2
         SPECIAL = 3
 
-    class JuraButton(StrEnum):
-        BUTTON_1 = "FA:04\r\n"
-        BUTTON_2 = "FA:05\r\n"
-        BUTTON_3 = "FA:06\r\n"
-        BUTTON_4 = "FA:07\r\n"
-        BUTTON_5 = "FA:08\r\n"
-        BUTTON_6 = "FA:09\r\n"
-
     # Mapping coffee type to button
     coffee_button_map = {
-        CoffeeType.ESPRESSO: JuraButton.BUTTON_1,
-        CoffeeType.RISTRETTO: JuraButton.BUTTON_2,
-        CoffeeType.COFFEE: JuraButton.BUTTON_4,
-        CoffeeType.SPECIAL: JuraButton.BUTTON_5,
+        CoffeeType.ESPRESSO: JuraCommand.BUTTON_1,
+        CoffeeType.RISTRETTO: JuraCommand.BUTTON_2,
+        CoffeeType.COFFEE: JuraCommand.BUTTON_4,
+        CoffeeType.SPECIAL: JuraCommand.BUTTON_5,
     }
 
     # min, initial, max, step
@@ -90,16 +82,16 @@ class CoffeeMaker:
         """
         A subsequent call to self.connection.read() must be done to receive the acknowledgment
         """
-        self.connection.write(CoffeeMaker.JuraButton.BUTTON_2)
+        self.connection.write(JuraCommand.BUTTON_2)
 
     def __more__(self):
         """
         A subsequent call to self.connection.read() must be done to receive the acknowledgment
         """
-        self.connection.write(CoffeeMaker.JuraButton.BUTTON_5)
+        self.connection.write(JuraCommand.BUTTON_5)
 
     def __stop__(self):
         """
         A subsequent call to self.connection.read() must be done to receive the acknowledgment
         """
-        self.connection.write(CoffeeMaker.JuraButton.BUTTON_6)
+        self.connection.write(JuraCommand.BUTTON_6)
