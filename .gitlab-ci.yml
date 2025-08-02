@@ -6,11 +6,11 @@ stages:
 
 test:
   stage: test
-  coverage: '/^TOTAL\s+\d+\s+\d+\s+\d+\s+(\d+)%$/'
+  coverage: '/TOTAL.+ ([0-9]{1,3}%)/'
   script:
     - pip install -r requirements.txt
     - pip install -e .
-    - coverage run -m pytest tests/
+    - coverage run -m pytest --junitxml=junit.xml tests/
     - coverage report
     - coverage xml
   artifacts:
