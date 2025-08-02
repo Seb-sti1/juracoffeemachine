@@ -1,8 +1,10 @@
 This small python package makes it possible to brew coffee with a Jura E6 machin.
 
-**All the protocol used in this project was decoded by [COM8](https://github.com/COM8) in his
-project [protocol-cpp](https://github.com/Jutta-Proto/protocol-cpp) (see also the
-organisation [JuttaProto](https://github.com/Jutta-Proto)).**
+It is _(will be)_ used in app that tracks how many coffees each employee takes.
+Therefore, it aims for high reliability and low maintenance.
+
+> [!NOTE]
+> This code was tested on a Jura responding `ty:EF532M V02.03` `TY:` and `tl:BL_RL78 V01.31` to `TL:`.
 
 ## Installation
 
@@ -29,26 +31,31 @@ machin = CoffeeMaker(JuraProtocol("/dev/ttyUSB0"))
 machin.brew_coffee(machin.CoffeeType.COFFEE)
 ```
 
-## Contributions
+## Jura's protocol
+
+If you're only interested in the protocol itself and which information can be retrieved, check out:
+
+- [encode](juracoffeemachine/jura.py), [decode](juracoffeemachine/jura.py): functions to send message to the jura
+- [JuraCommand](juracoffeemachine/jura.py): the list of message that is used in this package
+- [GROUP_REGEX](juracoffeemachine/jura.py): part of the signification of the response from the jura
+
+## Acknowledgments, contributions & license
+
+### Acknowledgments
+
+Other work exists to try and control Jura coffee machines.
+All the protocol used in this project was decoded by [COM8](https://github.com/COM8) in his
+project [protocol-cpp](https://github.com/Jutta-Proto/protocol-cpp) (see also the
+organisation [JuttaProto](https://github.com/Jutta-Proto)).
+[Juramote](https://6xq.net/juramote/), [q42](https://blog.q42.nl/hacking-the-coffee-machine-5802172b17c1/),
+[at.ua](https://protocol-jura.at.ua/index/commands_for_coffeemaker/0-5) was also of
+great help to extract relevant information from the Jura.
+
+### Contributions
 
 All contribution are welcomed, submit an issue for bug reports/feature requests (or open a pull request if you
 already implemented the feature).
 
-## License
-
-Copyright (C) 2025 Seb-sti1
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
+### License
 
 See [LICENSE](LICENSE)
