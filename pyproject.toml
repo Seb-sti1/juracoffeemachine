@@ -15,7 +15,9 @@ license = { file = "LICENSE" }
 description = "Controls a Jura E6"
 authors = [{ name = "Seb-sti1", email = "noreply@kerbourch.fr" }]
 dependencies = [
-    "pyserial==3.5"
+    "pyserial==3.5",
+    "pytest", # dev only
+    "coverage" # dev only
 ]
 
 

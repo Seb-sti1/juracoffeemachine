@@ -1,8 +1,9 @@
 import logging
+import os
 import time
 from enum import IntEnum
 
-from juracoffeemachine.jura import JuraProtocol, JuraCommand
+from juracoffeemachine.jura import JuraProtocol, JuraCommand, JuraSerial
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,9 @@ class CoffeeMaker:
     coffee_bean_param = (0, 3, 7, 1)
     water_volume_param = (80, 100, 150, 5)
 
-    def __init__(self, protocol: JuraProtocol):
-        self.connection: JuraProtocol = protocol
+    def __init__(self, port: str):
+        self.connection: JuraProtocol = JuraProtocol(JuraSerial(port),
+                                      lambda b: b.dump(os.path.join(os.path.dirname(__file__), str(int(time.time())))))
         response = self.connection.write_with_response(JuraCommand.GET_TYPE, 1.0)
         assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
         response = self.connection.write_with_response(JuraCommand.GET_LOADER, 1.0)

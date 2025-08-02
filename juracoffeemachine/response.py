@@ -16,7 +16,7 @@ class Response:
 
     @staticmethod
     def __check__(data: str, regex: str) -> bool:
-        raise re.match(regex, data) is not None
+        return re.match(regex, data) is not None
 
     def __repr__(self):
         return self.__str__()
@@ -49,27 +49,27 @@ class HZ(Response):
         assert m is not None
         group = m.groupdict()
 
-        self.is_sleeping = group["SLEEPING"] == 1
-        self.is_bowl_moving = group["BOWL_MOVING"] == 0
+        self.is_sleeping = group["SLEEPING"] == "1"
+        self.is_bowl_moving = group["BOWL_MOVING"] == "0"
         self.bowl_pos = int(group["BOWL_POS"], 16)
         self.water_vol = int(group["WATER_VOL"], 16)
         self.heater = int(group["HEATER"], 16)
-        self.is_water_tank_present = group["WATER_TANK"] == 0
-        self.is_coffee_waste_full = group["COFFEE_WASTE"] == 0
-        self.is_draining_tray_present = group["DRAINING_TRAY"] == 0
-        self.is_draining_tray_full = group["DRAINING_TRAY_FULL"] == 1
-        self.unknown_a = group["UNKNOWNA"] == 1
-        self.unknown_d = group["UNKNOWND"] == 1
-        self.unknown_c = group["UNKNOWNC"] == 1
+        self.is_water_tank_present = group["WATER_TANK"] == "0"
+        self.is_coffee_waste_full = group["COFFEE_WASTE"] == "0"
+        self.is_draining_tray_present = group["DRAINING_TRAY"] == "0"
+        self.is_draining_tray_full = group["DRAINING_TRAY_FULL"] == "1"
+        self.unknown_a = group["UNKNOWNA"] == "1"
+        self.unknown_d = group["UNKNOWND"] == "1"
+        self.unknown_c = group["UNKNOWNC"] == "1"
         self.unknown_e = int(group["UNKNOWNE"], 16)
 
     @staticmethod
     def check_format(data: str) -> bool:
-        return super().__check__(data, HZ.FORMAT)
+        return Response.__check__(data, HZ.FORMAT)
 
     @staticmethod
     def check_static(data: str) -> bool:
-        return super().__check__(data, HZ.STATIC_VALUE)
+        return Response.__check__(data, HZ.STATIC_VALUE)
 
     def __str__(self):
         return (f"{self.is_sleeping}, {self.is_bowl_moving}, {self.bowl_pos}, {self.water_vol}, {self.heater},"
@@ -117,11 +117,11 @@ class CS(Response):
 
     @staticmethod
     def check_format(data: str) -> bool:
-        return super().__check__(data, CS.FORMAT)
+        return Response.__check__(data, CS.FORMAT)
 
     @staticmethod
     def check_static(data: str) -> bool:
-        return super().__check__(data, CS.STATIC_VALUE)
+        return Response.__check__(data, CS.STATIC_VALUE)
 
     def __str__(self):
         return (f"{self.heater}, {self.bowl_pos_2}, {self.water_vol}, {self.unknown_b}, {self.unknown_f},"
@@ -148,11 +148,11 @@ class IC(Response):
 
     @staticmethod
     def check_format(data: str) -> bool:
-        return super().__check__(data, IC.FORMAT)
+        return Response.__check__(data, IC.FORMAT)
 
     @staticmethod
     def check_static(data: str) -> bool:
-        return super().__check__(data, IC.STATIC_VALUE)
+        return Response.__check__(data, IC.STATIC_VALUE)
 
     def __str__(self):
         return f"{self.unknown_m}"

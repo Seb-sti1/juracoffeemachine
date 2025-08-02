@@ -145,13 +145,10 @@ class JuraProtocol:
         JuraCommand.IC: IC,
     }
 
-    def __init__(self, device: str, unexpected_msg_callback: Callable[[CircularBuffer], None]):
-        self.__serial__ = JuraSerial(device)
+    def __init__(self, s: AbstractSerial, unexpected_msg_callback: Callable[[CircularBuffer], None]):
+        self.__serial__ = s
         self.actionLock = threading.Lock()
         self.unexpected_msg_callback = unexpected_msg_callback
-
-    def get_raw(self, command: JuraCommand) -> Optional[str]:
-        return self.write_with_response(command)
 
     @overload
     def get_and_parse_message(self, command: JuraCommand.HZ, raw: Optional[str] = None) -> Optional[HZ]:
@@ -166,7 +163,7 @@ class JuraProtocol:
         ...
 
     def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
-        raw = raw if raw is not None else self.get_raw(command)
+        raw = raw if raw is not None else self.write_with_response(command)
         if raw is None:
             return None
 
