@@ -67,7 +67,7 @@ def test_wrong_static_hz():
         "hz:010101100000000288,00ED,0107,03E8,0000,0,0017,000100,12"
     ],
 )
-def test_format_hz(hz_msg):
+def test_wrong_format_hz(hz_msg):
     t = ValidSerial()
     t.read_buffer = encode_str(hz_msg)
     callback_called = [False]
@@ -97,6 +97,7 @@ def test_valid_cs():
     assert cs.bowl_pos_2 == 237
     assert cs.water_vol == 284
     assert cs.heater == 887
+    assert not cs.is_water_tank_empty
 
 
 def test_valid_ic():

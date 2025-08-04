@@ -79,13 +79,13 @@ class HZ(Response):
 
 class CS(Response):
     # Extracted groups are indicated by - or . in examples
-    # cs:....00000....---000...---0..000....00...---
+    # cs:....00000....---00-...---0..000....00...---
     # cs:03770000000ED000000000000006000011C00000000
 
     # HEATER (extremely probable): the value of the heater of the machine
     # BOWL_POS_2 (unsure): variation are the same as BOWL_POS but maximum value seems different
     # UNKNOWNB: 0-1023, close to UNKNOWNG + UNKNOWNH
-    # UNKNOWNF: 0-1023, seen while getting hot water
+    # WATER_TANK (probable): is water thank empty (0 = false, 1 = true)
     # UNKNOWNG: 0-1023, seems very synchronised with WATER_VOL
     # UNKNOWNH: between 0-1023 just before the BOWL_POS moves, could be when grinding coffee beans
     # UNKNOWNI: 6 all the time except after the water finished then 176
@@ -93,9 +93,9 @@ class CS(Response):
     # UNKNOWNK: 0-1023, just before water start flowing and smaller value at the very end
     # UNKNOWNL: 0-1023, at the very end
     FORMAT = r"^cs:...........................................$"
-    STATIC_VALUE = r"^cs:....00000.......000......0..000....00......$"
-    GROUPS = (r"^cs:(?P<HEATER>....)00000(?P<BOWL_POS_2>....)(?P<UNKNOWNB>...)(?P<UNKNOWNF>...)"
-              r"(?P<UNKNOWNG>...)(?P<UNKNOWNH>...)0(?P<UNKNOWNI>..)000(?P<WATER_VOL>....)00"
+    STATIC_VALUE = r"^cs:....00000.......00.......0..000....00......$"
+    GROUPS = (r"^cs:(?P<HEATER>....).....(?P<BOWL_POS_2>....)(?P<UNKNOWNB>...)..(?P<WATER_TANK>.)"
+              r"(?P<UNKNOWNG>...)(?P<UNKNOWNH>...).(?P<UNKNOWNI>..)...(?P<WATER_VOL>....).."
               r"(?P<UNKNOWNK>...)(?P<UNKNOWNL>...)$")
 
     def __init__(self, data: str):
@@ -107,8 +107,8 @@ class CS(Response):
         self.heater = int(group["HEATER"], 16)
         self.bowl_pos_2 = int(group["BOWL_POS_2"], 16)
         self.water_vol = int(group["WATER_VOL"], 16)
+        self.is_water_tank_empty = group["WATER_TANK"] == "1"
         self.unknown_b = int(group["UNKNOWNB"], 16)
-        self.unknown_f = int(group["UNKNOWNF"], 16)
         self.unknown_g = int(group["UNKNOWNG"], 16)
         self.unknown_h = int(group["UNKNOWNH"], 16)
         self.unknown_i = int(group["UNKNOWNI"], 16)
@@ -124,7 +124,7 @@ class CS(Response):
         return Response.__check__(data, CS.STATIC_VALUE)
 
     def __str__(self):
-        return (f"{self.heater}, {self.bowl_pos_2}, {self.water_vol}, {self.unknown_b}, {self.unknown_f},"
+        return (f"{self.heater}, {self.bowl_pos_2}, {self.water_vol}, {self.is_water_tank_empty} {self.unknown_b},"
                 f" {self.unknown_g}, {self.unknown_h}, {self.unknown_i}, {self.unknown_k}, {self.unknown_l}")
 
 
