@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from enum import StrEnum
+from enum import StrEnum, Enum
 from pathlib import Path
 from typing import List, Optional, Callable, overload
 
@@ -9,6 +9,27 @@ from juracoffeemachine.response import HZ, CS, IC, Response
 from juracoffeemachine.serial import CircularBuffer, AbstractSerial
 
 logger = logging.getLogger(__name__)
+
+
+class JuraAddress(Enum):
+    TOT_ESPRESSO = 0x0
+    TOT_2_ESPRESSO = 0xE0
+    TOT_RISTRETTO = 0x1
+    TOT_2_RISTRETTO = 0xE1
+    TOT_COFFEE = 0x2
+    TOT_2_COFFEE = 0xE2
+    TOT_SPECIAL = 0x208
+    TOT_HOT_WATER = 0x014
+
+    # note that daily is not really daily, it is a value that the user can reset manually
+    DAILY_ESPRESSO = 0x180
+    # DAILY_2_ESPRESSO = ?
+    DAILY_RISTRETTO = 0x181
+    # DAILY_2_RISTRETTO = ?
+    DAILY_COFFEE = 0x182
+    # DAILY_2_COFFEE = ?
+    DAILY_SPECIAL = 0x188
+    DAILY_HOT_WATER = 0x18D
 
 
 class JuraCommand(StrEnum):
@@ -87,8 +108,13 @@ class JuraProtocol:
             self.unexpected_msg_callback(self.__serial__.get_debug_buffer())
             return None
 
-    def read_eeprom(self, address: str, use_rt: bool = False) -> str:
-        cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address.upper()}"
+    def log_statistics(self):
+        for a in JuraAddress:
+            logger.info(f"{a.name}: {int(self.read_eeprom(int(a.value)), 16)}")
+
+    def read_eeprom(self, address: int, use_rt: bool = False) -> str:
+        address_str = hex(address)[2:].rjust(4).replace(' ', '0').upper()
+        cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address_str}"
         r = self.write_with_response(cmd)
         return r.split(":")[-1]
 
@@ -96,9 +122,8 @@ class JuraProtocol:
         mem = ""
         address = 0
         while address < 0x400:
-            a = hex(address)[2:].rjust(4).replace(' ', '0')
-            r = self.read_eeprom(a, True)
-            logger.debug(f"{a} -> {r}")
+            r = self.read_eeprom(address, True)
+            logger.debug(f"{hex(address).ljust(6)} -> {r}")
             mem += r
             address += 16
         return mem
