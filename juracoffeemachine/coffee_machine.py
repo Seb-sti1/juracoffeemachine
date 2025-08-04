@@ -84,7 +84,7 @@ class CoffeeMaker:
 
             if water_volume != self.water_volume_param[1]:
                 logger.info("sending water volume commands")
-                self.__reach_value__(self.water_volume_param[1], coffee_bean, self.water_volume_param[3])
+                self.__reach_value__(self.water_volume_param[1], water_volume, self.water_volume_param[3])
 
             # TODO use cs to detect end
 
