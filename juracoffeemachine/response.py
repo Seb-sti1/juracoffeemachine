@@ -3,8 +3,8 @@ import re
 
 class Response:
 
-    def __init__(self):
-        pass
+    def __init__(self, raw: str):
+        self.raw = raw
 
     @staticmethod
     def check_format(data: str) -> bool:
@@ -44,7 +44,7 @@ class HZ(Response):
               r".(?P<WATER_TANK>.).(?P<COFFEE_WASTE>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),..$")
 
     def __init__(self, data: str):
-        super().__init__()
+        super().__init__(data)
         m = re.match(HZ.GROUPS, data)
         assert m is not None
         group = m.groupdict()
@@ -99,7 +99,7 @@ class CS(Response):
               r"(?P<UNKNOWNK>...)(?P<UNKNOWNL>...)$")
 
     def __init__(self, data: str):
-        super().__init__()
+        super().__init__(data)
         m = re.match(CS.GROUPS, data)
         assert m is not None
         group = m.groupdict()
@@ -139,7 +139,7 @@ class IC(Response):
     GROUPS = r"^ic:(?P<UNKNOWNM>....)$"
 
     def __init__(self, data: str):
-        super().__init__()
+        super().__init__(data)
         m = re.match(IC.GROUPS, data)
         assert m is not None
         group = m.groupdict()
