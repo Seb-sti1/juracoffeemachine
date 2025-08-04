@@ -53,13 +53,13 @@ class CoffeeMaker:
         return False
 
     def __reach_value__(self, initial: int, goal: int, step: int):
-        logger.info(f"doing {abs(goal - initial) // step} button push")
+        logger.debug(f"doing {abs(goal - initial) // step} button push")
         to_send = abs(goal - initial) // step
         tries = 3
         while tries > 0 and to_send > 0:
             tries -= 1
             for _ in range(0, to_send):
-                logger.info("less" if goal < initial else "more")
+                logger.debug("less" if goal < initial else "more")
                 self.__less__() if goal < initial else self.__more__()
                 time.sleep(0.1)
 
@@ -74,17 +74,17 @@ class CoffeeMaker:
             dt = time.time()
             time.sleep(0.6)
             if coffee_bean != self.coffee_bean_param[1]:
-                logger.info("sending coffee commands")
+                logger.debug("sending coffee commands")
                 self.__reach_value__(self.coffee_bean_param[1], coffee_bean, self.coffee_bean_param[3])
 
             # TODO use cs to detect when to send water volume commands?
             dt = time.time() - dt
             if dt < 6:
-                logger.info(f"waiting {6 - dt}")
+                logger.debug(f"waiting {6 - dt}")
                 time.sleep(6 - dt)
 
             if water_volume != self.water_volume_param[1]:
-                logger.info("sending water volume commands")
+                logger.debug("sending water volume commands")
                 self.__reach_value__(self.water_volume_param[1], water_volume, self.water_volume_param[3])
 
             # TODO use cs to detect end
