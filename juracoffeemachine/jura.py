@@ -88,7 +88,7 @@ class JuraProtocol:
             return None
 
     def read_eeprom(self, address: str, use_rt: bool = False) -> str:
-        cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}:{address.upper()}"
+        cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address.upper()}"
         r = self.write_with_response(cmd)
         return r.split(":")[-1]
 
