@@ -36,6 +36,7 @@ class CoffeeMaker:
         assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
         response = self.connection.write_with_response(JuraCommand.GET_LOADER, 1.0)
         assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
+        logger.info("Coffee Maker connected.")
 
     @staticmethod
     def create_from_uart(port: str) -> CoffeeMaker:
