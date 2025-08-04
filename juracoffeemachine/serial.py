@@ -18,8 +18,8 @@ class CircularBuffer:
             self.buffer = self.buffer[1:]
 
     def dump(self, path: Path):
-        f = path.open("r")
-        f.write('\n'.join(map(lambda e: f"{e[0]}, {e[1]}", self.buffer)))
+        with path.open("w") as f:
+            f.write('\n'.join(f"{e[0]}, {e[1]}" for e in self.buffer))
 
 
 class AbstractSerial:
