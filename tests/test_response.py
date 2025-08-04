@@ -5,23 +5,20 @@ from test_jura import ValidSerial
 def encode_str(data) -> list[int]:
     encoded = []
     for c in data + "\r\n":
-        encoded += JuraProtocol.encode(ord(c))
+        encoded += JuraProtocol.encode(ord(c))  # tested in test_jura.py
     return encoded
 
 
 def test_valid_hz():
     t = ValidSerial()
     t.read_buffer = encode_str("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12")
-    callback_called = [False]
 
     def callback():
-        callback_called[0] = True
+        assert False
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
     hz = p.get_and_parse_message(JuraCommand.HZ)
     assert isinstance(hz, HZ)
-
-    assert not callback_called[0]
 
     assert not hz.is_sleeping
     assert not hz.is_bowl_moving
@@ -37,15 +34,13 @@ def test_valid_hz():
 def test_valid_cs():
     t = ValidSerial()
     t.read_buffer = encode_str("cs:03770000000ED000000000000006000011C00000000")
-    callback_called = [False]
 
     def callback():
-        callback_called[0] = True
+        assert False
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
     cs = p.get_and_parse_message(JuraCommand.CS)
     assert isinstance(cs, CS)
-    assert not callback_called[0]
 
     assert cs.bowl_pos_2 == 237
     assert cs.water_vol == 284

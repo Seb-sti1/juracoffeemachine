@@ -91,11 +91,6 @@ def test_read_eeprom():
     t.read_buffer = [95, 95, 123, 95, 123, 123, 127, 91, 95, 95, 91, 95, 95, 91, 91, 95, 95, 95, 91, 95, 95, 91, 91, 95,
                      95, 127, 91, 91, 123, 123, 91, 91]
 
-    print(JuraProtocol.encode(ord("r")))
-    print(JuraProtocol.encode(ord("e")))
-    print(JuraProtocol.encode(ord(":")))
-    print(JuraProtocol.encode(ord("E")))
-    print(JuraProtocol.encode(ord("A")))
     resp = p.read_eeprom("02a3")
 
     assert t.write_buffer == [123, 91, 95, 95, 95, 95, 91, 95, 123, 123, 127, 91, 123, 123, 127, 91, 91, 91, 127, 91,

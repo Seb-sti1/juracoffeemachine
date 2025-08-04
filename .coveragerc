@@ -1,0 +1,4 @@
+[run]
+omit =
+      test_*
+      juracoffeemachine/serial.py
