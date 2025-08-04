@@ -3,7 +3,8 @@ import os
 import time
 from enum import IntEnum
 
-from juracoffeemachine.jura import JuraProtocol, JuraCommand, JuraSerial
+from juracoffeemachine.jura import JuraProtocol, JuraCommand
+from juracoffeemachine.serial import JuraSerial
 
 logger = logging.getLogger(__name__)
 
