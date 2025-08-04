@@ -19,7 +19,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, handlers=[console_handler])
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
-    machin = CoffeeMaker(args.port)
+    machin = CoffeeMaker.create_from_uart(args.port)
     machin.brew_coffee(machin.CoffeeType.COFFEE, 3, 100)
 
 
