@@ -39,7 +39,7 @@ def test_wrong_static_hz():
     t.read_buffer = encode_str("hz:00010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12")
     callback_called = [False]
 
-    def callback(c):
+    def callback(_):
         callback_called[0] = True
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
@@ -72,7 +72,7 @@ def test_wrong_format_hz(hz_msg):
     t.read_buffer = encode_str(hz_msg)
     callback_called = [False]
 
-    def callback(c):
+    def callback(_):
         callback_called[0] = True
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
@@ -98,6 +98,47 @@ def test_valid_cs():
     assert cs.water_vol == 284
     assert cs.heater == 887
     assert not cs.is_water_tank_empty
+
+
+def test_wrong_static_cs():
+    t = ValidSerial()
+    t.read_buffer = encode_str("cs:0377000FF00ED000000000000006000011C00000000")
+    callback_called = [False]
+
+    def callback(_):
+        callback_called[0] = True
+
+    p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
+    cs = p.get_and_parse_message(JuraCommand.CS)
+    assert isinstance(cs, CS)
+    assert callback_called[0]
+    assert t.read_index == len(t.read_buffer)
+
+    assert cs.bowl_pos_2 == 237
+    assert cs.water_vol == 284
+    assert cs.heater == 887
+    assert not cs.is_water_tank_empty
+
+
+@pytest.mark.parametrize(
+    "cs_msg",
+    [
+        "cs:03770000000ED000000000000006000011C0000",
+    ],
+)
+def test_wrong_format_cs(cs_msg):
+    t = ValidSerial()
+    t.read_buffer = encode_str(cs_msg)
+    callback_called = [False]
+
+    def callback(_):
+        callback_called[0] = True
+
+    p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
+    cs = p.get_and_parse_message(JuraCommand.CS)
+    assert cs is None
+    assert callback_called[0]
+    assert t.read_index == len(t.read_buffer)
 
 
 def test_valid_ic():
