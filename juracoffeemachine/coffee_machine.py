@@ -72,7 +72,7 @@ class CoffeeMaker:
         water_volume = max(self.water_volume_param[0], min(self.water_volume_param[2], water_volume))
         if self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[coffee]):
             dt = time.time()
-            time.sleep(0.6)
+            time.sleep(0.6) # TODO try new timings
             if coffee_bean != self.coffee_bean_param[1]:
                 logger.debug("sending coffee commands")
                 self.__reach_value__(self.coffee_bean_param[1], coffee_bean, self.coffee_bean_param[3])
