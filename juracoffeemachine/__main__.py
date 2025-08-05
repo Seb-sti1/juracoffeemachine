@@ -27,10 +27,12 @@ def main():
     machin = CoffeeMaker.create_from_uart(args.port)
     if args.action == "while_hz":
         while True:
-            logger.info(machin.connection.get_and_parse_message(JuraCommand.HZ))
+            msg = machin.connection.get_and_parse_message(JuraCommand.HZ)
+            logger.info(f"{msg.raw}: {msg}")
     elif args.action == "while_cs":
         while True:
-            logger.info(machin.connection.get_and_parse_message(JuraCommand.CS))
+            msg = machin.connection.get_and_parse_message(JuraCommand.CS)
+            logger.info(f"{msg.raw}: {msg}")
     elif args.action == "brew_coffee":
         machin.brew_coffee(machin.CoffeeType.COFFEE, 2, 100)
     elif args.action == "eeprom":
