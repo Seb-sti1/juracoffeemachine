@@ -34,14 +34,13 @@ class HZ(Response):
     # WATER_VOL (extremely probable): value*0,4577 ~= water volume in ml
     # HEATER (extremely probable): the value of the heater of the machine
     # WATER_TANK (extremely probable): 0 = water tank present, 1 = water tank absent
-    # COFFEE_WASTE (probable): 0 = waste tank full, 1 = waste tank not full
     # DRAINING_TRAY (probable): 0 = draining tray present, 1 = draining tray absent
     # DRAINING_TRAY_FULL (probable): 0 = draining tray not full, 1 = draining tray full
     FORMAT = r"^hz:..............,....,....,....,....,....,.,....,......,..$"
     STATIC_VALUE = r"^hz:.10.0..000.000,0288,....,....,....,0000,0,....,0.0...,12$"
     GROUPS = (r"^hz:(?P<SLEEPING>.)..(?P<UNKNOWNA>.).(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)...(?P<UNKNOWNC>.)...,"
               r"....,(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),....,.,(?P<UNKNOWNE>....),"
-              r".(?P<WATER_TANK>.).(?P<COFFEE_WASTE>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),..$")
+              r".(?P<WATER_TANK>.).(?P<UNKNOWNF>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),..$")
 
     def __init__(self, data: str):
         super().__init__(data)
@@ -55,13 +54,13 @@ class HZ(Response):
         self.water_vol = int(group["WATER_VOL"], 16)
         self.heater = int(group["HEATER"], 16)
         self.is_water_tank_present = group["WATER_TANK"] == "0"
-        self.is_coffee_waste_full = group["COFFEE_WASTE"] == "0"
         self.is_draining_tray_present = group["DRAINING_TRAY"] == "0"
         self.is_draining_tray_full = group["DRAINING_TRAY_FULL"] == "1"
         self.unknown_a = group["UNKNOWNA"] == "1"
-        self.unknown_d = group["UNKNOWND"] == "1"
         self.unknown_c = group["UNKNOWNC"] == "1"
+        self.unknown_d = group["UNKNOWND"] == "1"
         self.unknown_e = int(group["UNKNOWNE"], 16)
+        self.unknown_f = group["UNKNOWNF"] == "1"
 
     @staticmethod
     def check_format(data: str) -> bool:
@@ -73,8 +72,8 @@ class HZ(Response):
 
     def __str__(self):
         return (f"{self.is_sleeping}, {self.is_bowl_moving}, {self.bowl_pos}, {self.water_vol}, {self.heater},"
-                f" {self.is_water_tank_present}, {self.is_coffee_waste_full}, {self.is_draining_tray_present},"
-                f" {self.is_draining_tray_full}, {self.unknown_a}, {self.unknown_d}, {self.unknown_c}, {self.unknown_e}")
+                f" {self.is_water_tank_present}, {self.is_draining_tray_present}, {self.is_draining_tray_full},"
+                f" {self.unknown_a}, {self.unknown_d}, {self.unknown_c}, {self.unknown_e}, {self.unknown_f}")
 
 
 class CS(Response):

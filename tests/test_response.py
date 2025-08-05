@@ -29,7 +29,6 @@ def test_valid_hz():
     assert hz.water_vol == 263
     assert hz.heater == 1000
     assert hz.is_water_tank_present
-    assert not hz.is_coffee_waste_full
     assert hz.is_draining_tray_present
     assert not hz.is_draining_tray_full
 
@@ -54,7 +53,6 @@ def test_wrong_static_hz():
     assert hz.water_vol == 263
     assert hz.heater == 1000
     assert hz.is_water_tank_present
-    assert not hz.is_coffee_waste_full
     assert hz.is_draining_tray_present
     assert not hz.is_draining_tray_full
 
