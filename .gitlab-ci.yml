@@ -54,7 +54,7 @@ release:
 publish:
   stage: release
   before_script:
-    - python3.10 -m venv .venv
+    - python -m venv .venv
     - source .venv/bin/activate
     - pip install twine
   rules:
