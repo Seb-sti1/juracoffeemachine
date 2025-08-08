@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('port', default='/dev/ttyUSB0', help='Serial port (default: /dev/ttyUSB0)')
-    parser.add_argument('action', choices=["while_hz", "while_cs", "brew_coffee", "eeprom"],
+    parser.add_argument('action', choices=["hz", "cs", "stat", "while_hz", "while_cs", "brew_coffee", "eeprom"],
                         help='What should be done')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable debug output')
     args = parser.parse_args()
@@ -25,7 +25,15 @@ def main():
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     machin = CoffeeMaker.create_from_uart(args.port)
-    if args.action == "while_hz":
+    if args.action == "hz":
+        msg = machin.connection.get_and_parse_message(JuraCommand.HZ)
+        logger.info(f"{msg.raw}: {msg}")
+    elif args.action == "cs":
+        msg = machin.connection.get_and_parse_message(JuraCommand.CS)
+        logger.info(f"{msg.raw}: {msg}")
+    elif args.action == "stat":
+        machin.connection.log_statistics()
+    elif args.action == "while_hz":
         while True:
             msg = machin.connection.get_and_parse_message(JuraCommand.HZ)
             logger.info(f"{msg.raw}: {msg}")
