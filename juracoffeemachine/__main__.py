@@ -37,6 +37,7 @@ def main():
         machin.brew_coffee(machin.CoffeeType.COFFEE, 2, 100)
     elif args.action == "eeprom":
         machin.connection.dump_eeprom_to_file(Path(f"./eeprom{int(time.time())}.dump"))
+    machin.connection.__serial__.close()
 
 
 if __name__ == "__main__":
