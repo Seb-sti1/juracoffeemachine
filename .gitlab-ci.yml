@@ -3,6 +3,7 @@ image: python:3.11-alpine
 stages:
   - test
   - build
+  - release
 
 test:
   stage: test
@@ -21,15 +22,44 @@ test:
         path: coverage.xml
     paths:
       - coverage.xml
-    expire_in: 1 week
-    
+
 build:
   stage: build
   script:
     - pip install -r ./requirements.txt
     - pip install build
     - python -m build
+  dependencies:
+    - test
   artifacts:
     paths:
       - dist/*.whl
-    expire_in: 1 week
+      - dist/*.tar.gz
+
+release:
+  stage: release
+  image:
+    name: gitlab/glab:latest
+    entrypoint: [ "" ]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  dependencies:
+    - build
+  script:
+    - export VERSION=$(grep -m 1 version pyproject.toml | tr -s ' ' | tr -d '"' | tr -d "'" | cut -d' ' -f3)
+    - glab auth login --hostname gitlab.ensta.fr --token $RELEASE_TOKEN
+    - glab release create "$VERSION" --name "Release $VERSION" --notes "Automated release" --ref $CI_COMMIT_SHA --repo https://gitlab.ensta.fr/u2is-coffee-team/jura-uart ./dist/*.whl
+
+
+publish:
+  stage: release
+  before_script:
+    - python3.10 -m venv .venv
+    - source .venv/bin/activate
+    - pip install twine
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  dependencies:
+    - build
+  script:
+    - TWINE_PASSWORD=${CI_JOB_TOKEN} TWINE_USERNAME=gitlab-ci-token python -m twine upload --repository-url ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi dist/*
