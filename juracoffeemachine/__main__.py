@@ -2,6 +2,7 @@ import argparse
 import logging
 import sys
 import time
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from juracoffeemachine import JuraCommand
@@ -19,9 +20,11 @@ def main():
     args = parser.parse_args()
 
     fmt = logging.Formatter("%(levelname)s:%(asctime)s:%(name)s:%(message)s", datefmt='%Y-%m-%d %H:%M:%S')
+    rotating_handler = RotatingFileHandler(Path("~/coffee/jura.log").expanduser(), maxBytes=10485760, backupCount=10)
+    rotating_handler.setFormatter(fmt)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(fmt)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, handlers=[console_handler])
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, handlers=[rotating_handler, console_handler])
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     machin = CoffeeMaker.create_from_uart(args.port)
