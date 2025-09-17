@@ -24,7 +24,7 @@ class Response:
 
 class HZ(Response):
     # Extracted groups are indicated by - or . in examples
-    # hz:.10-0-.000.000,0288,....,....,....,0000,0,....,0.0.-.,12
+    # hz:.1.-.-.-00.000,0288,....,....,....,0000,0,....,0.0.-.,12
     # hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12
 
     # UNKNOWNA: first seen will cleaning
@@ -37,10 +37,11 @@ class HZ(Response):
     # DRAINING_TRAY (probable): 0 = draining tray present, 1 = draining tray absent
     # DRAINING_TRAY_FULL (probable): 0 = draining tray not full, 1 = draining tray full
     FORMAT = r"^hz:..............,....,....,....,....,....,.,....,......,..$"
-    STATIC_VALUE = r"^hz:.10.0..000.000,0288,....,....,....,0000,0,....,0.0...,12$"
-    GROUPS = (r"^hz:(?P<SLEEPING>.)..(?P<UNKNOWNA>.).(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)...(?P<UNKNOWNC>.)...,"
-              r"....,(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),....,.,(?P<UNKNOWNE>....),"
-              r".(?P<WATER_TANK>.).(?P<UNKNOWNF>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),..$")
+    STATIC_VALUE = r"^hz:.1......00.000,0288,....,....,....,0000,0,....,0.0...,12$"
+    GROUPS = (
+        r"^hz:(?P<SLEEPING>.).(?P<UNKNOWNB>.)(?P<UNKNOWNA>.)(?P<UNKNOWNG>.)(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)(?P<UNKNOWNH>.)..(?P<UNKNOWNC>.)...,"
+        r"....,(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),....,.,(?P<UNKNOWNE>....),"
+        r".(?P<WATER_TANK>.).(?P<UNKNOWNF>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),..$")
 
     def __init__(self, data: str):
         super().__init__(data)
@@ -57,10 +58,13 @@ class HZ(Response):
         self.is_draining_tray_present = group["DRAINING_TRAY"] == "0"
         self.is_draining_tray_full = group["DRAINING_TRAY_FULL"] == "1"
         self.unknown_a = group["UNKNOWNA"] == "1"
+        self.unknown_b = group["UNKNOWNB"] == "1"
         self.unknown_c = group["UNKNOWNC"] == "1"
         self.unknown_d = group["UNKNOWND"] == "1"
         self.unknown_e = int(group["UNKNOWNE"], 16)
         self.unknown_f = group["UNKNOWNF"] == "1"
+        self.unknown_g = group["UNKNOWNG"] == "1"
+        self.unknown_h = group["UNKNOWNH"] == "1"
 
     @staticmethod
     def check_format(data: str) -> bool:
@@ -73,7 +77,8 @@ class HZ(Response):
     def __str__(self):
         return (f"{self.is_sleeping}, {self.is_bowl_moving}, {self.bowl_pos}, {self.water_vol}, {self.heater},"
                 f" {self.is_water_tank_present}, {self.is_draining_tray_present}, {self.is_draining_tray_full},"
-                f" {self.unknown_a}, {self.unknown_d}, {self.unknown_c}, {self.unknown_e}, {self.unknown_f}")
+                f" {self.unknown_a}, {self.unknown_b}, {self.unknown_c}, {self.unknown_d}, {self.unknown_e},"
+                f" {self.unknown_f}, {self.unknown_g}, {self.unknown_h}")
 
 
 class CS(Response):
