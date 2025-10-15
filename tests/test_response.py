@@ -35,7 +35,7 @@ def test_valid_hz():
 
 def test_wrong_static_hz():
     t = ValidSerial()
-    t.read_buffer = encode_str("hz:00010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12")
+    t.read_buffer = encode_str("hz:00010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,13")
     callback_called = [False]
 
     def callback(_):

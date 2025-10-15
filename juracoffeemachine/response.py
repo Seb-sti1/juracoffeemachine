@@ -24,7 +24,7 @@ class Response:
 
 class HZ(Response):
     # Extracted groups are indicated by - or . in examples
-    # hz:.1.-.-.-00.000,0288,....,....,....,0000,0,....,0.0.-.,12
+    # hz:.-.-.-.-00.000,----,....,....,....,0000,0,....,0.0.-.,12
     # hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12
 
     # UNKNOWNA: first seen will cleaning
@@ -37,10 +37,11 @@ class HZ(Response):
     # DRAINING_TRAY (probable): 0 = draining tray present, 1 = draining tray absent
     # DRAINING_TRAY_FULL (probable): 0 = draining tray not full, 1 = draining tray full
     FORMAT = r"^hz:..............,....,....,....,....,....,.,....,......,..$"
-    STATIC_VALUE = r"^hz:.1......00.000,0288,....,....,....,0000,0,....,0.0...,12$"
+    # STATIC_VALUE = r"^hz:.(1)......00.000,(0288),....,....,....,0000,0,....,0.0...,12$"
+    STATIC_VALUE = r"^hz:........00.000,....,....,....,....,0000,0,....,0.0...,12$"
     GROUPS = (
-        r"^hz:(?P<SLEEPING>.).(?P<UNKNOWNB>.)(?P<UNKNOWNA>.)(?P<UNKNOWNG>.)(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)(?P<UNKNOWNH>.)..(?P<UNKNOWNC>.)...,"
-        r"....,(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),....,.,(?P<UNKNOWNE>....),"
+        r"^hz:(?P<SLEEPING>.)(?P<UNKNOWNI>.)(?P<UNKNOWNB>.)(?P<UNKNOWNA>.)(?P<UNKNOWNG>.)(?P<UNKNOWND>.)(?P<BOWL_MOVING>.)(?P<UNKNOWNH>.)..(?P<UNKNOWNC>.)...,"
+        r"(?P<UNKNOWNJ>....),(?P<BOWL_POS>....),(?P<WATER_VOL>....),(?P<HEATER>....),....,.,(?P<UNKNOWNE>....),"
         r".(?P<WATER_TANK>.).(?P<UNKNOWNF>.)(?P<DRAINING_TRAY>.)(?P<DRAINING_TRAY_FULL>.),..$")
 
     def __init__(self, data: str):
@@ -65,6 +66,8 @@ class HZ(Response):
         self.unknown_f = group["UNKNOWNF"] == "1"
         self.unknown_g = group["UNKNOWNG"] == "1"
         self.unknown_h = group["UNKNOWNH"] == "1"
+        self.unknown_i = group["UNKNOWNI"] == "1"
+        self.unknown_j = int(group["UNKNOWNJ"], 16)
 
     @staticmethod
     def check_format(data: str) -> bool:
@@ -78,7 +81,7 @@ class HZ(Response):
         return (f"{self.is_sleeping}, {self.is_bowl_moving}, {self.bowl_pos}, {self.water_vol}, {self.heater},"
                 f" {self.is_water_tank_present}, {self.is_draining_tray_present}, {self.is_draining_tray_full},"
                 f" {self.unknown_a}, {self.unknown_b}, {self.unknown_c}, {self.unknown_d}, {self.unknown_e},"
-                f" {self.unknown_f}, {self.unknown_g}, {self.unknown_h}")
+                f" {self.unknown_f}, {self.unknown_g}, {self.unknown_h}, {self.unknown_i}, {self.unknown_j}")
 
 
 class CS(Response):
