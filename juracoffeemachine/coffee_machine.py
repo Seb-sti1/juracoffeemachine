@@ -59,13 +59,14 @@ class CoffeeMaker:
         while tries > 0 and to_send > 0:
             tries -= 1
             for _ in range(0, to_send):
-                logger.debug("less" if goal < initial else "more")
+                logger.debug("sending cmd" + ("less" if goal < initial else "more"))
                 self.__less__() if goal < initial else self.__more__()
                 time.sleep(0.1)
 
             for _ in range(0, to_send):
                 if self.connection.read() == "ok:":
                     to_send -= 1
+        logger.debug(f"done. to_send left {to_send} (should be 0).")
 
     def brew_coffee(self, coffee: CoffeeType, coffee_bean: int, water_volume: int) -> True:
         coffee_bean = max(self.coffee_bean_param[0], min(self.coffee_bean_param[2], coffee_bean))
