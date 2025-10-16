@@ -68,7 +68,7 @@ class CoffeeMaker:
                     to_send -= 1
         logger.debug(f"done. to_send left {to_send} (should be 0).")
 
-    def brew_coffee(self, coffee: CoffeeType, coffee_bean: int, water_volume: int) -> True:
+    def brew_coffee(self, coffee: CoffeeType, coffee_bean: int, water_volume: int) -> bool:
         coffee_bean = max(self.coffee_bean_param[0], min(self.coffee_bean_param[2], coffee_bean))
         water_volume = max(self.water_volume_param[0], min(self.water_volume_param[2], water_volume))
         if self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[coffee]):
@@ -89,6 +89,8 @@ class CoffeeMaker:
                 self.__reach_value__(self.water_volume_param[1], water_volume, self.water_volume_param[3])
 
             # TODO use cs to detect end
+            return True
+        return False
 
     def __less__(self):
         """
