@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
 from enum import IntEnum
 
@@ -52,7 +51,8 @@ class CoffeeMaker:
         logger.error(f"Receive wrong acknowledgement {result}")
         return False
 
-    def __reach_value__(self, initial: int, goal: int, step: int):
+    def __reach_value__(self, initial: int, goal: int, step: int,
+                        action_cooldown: float):
         logger.debug(f"doing {abs(goal - initial) // step} button push")
         to_send = abs(goal - initial) // step
         tries = 3
@@ -61,32 +61,36 @@ class CoffeeMaker:
             for _ in range(0, to_send):
                 logger.debug("sending cmd" + ("less" if goal < initial else "more"))
                 self.__less__() if goal < initial else self.__more__()
-                time.sleep(0.1)
+                time.sleep(action_cooldown)
 
             for _ in range(0, to_send):
                 if self.connection.read() == "ok:":
                     to_send -= 1
         logger.debug(f"done. to_send left {to_send} (should be 0).")
 
-    def brew_coffee(self, coffee: CoffeeType, coffee_bean: int, water_volume: int) -> bool:
+    def brew_coffee(self, coffee: CoffeeType, coffee_bean: int, water_volume: int,
+                    wait_before_coffee: float = 0.6, duration_to_water: float = 6,  # TODO try new timings
+                    action_cooldown: float = 0.1) -> bool:
         coffee_bean = max(self.coffee_bean_param[0], min(self.coffee_bean_param[2], coffee_bean))
         water_volume = max(self.water_volume_param[0], min(self.water_volume_param[2], water_volume))
         if self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[coffee]):
             dt = time.time()
-            time.sleep(0.6) # TODO try new timings
+            time.sleep(wait_before_coffee)
             if coffee_bean != self.coffee_bean_param[1]:
                 logger.debug("sending coffee commands")
-                self.__reach_value__(self.coffee_bean_param[1], coffee_bean, self.coffee_bean_param[3])
+                self.__reach_value__(self.coffee_bean_param[1], coffee_bean, self.coffee_bean_param[3],
+                                     action_cooldown)
 
             # TODO use cs to detect when to send water volume commands?
             dt = time.time() - dt
-            if dt < 6:
-                logger.debug(f"waiting {6 - dt}")
-                time.sleep(6 - dt)
+            if dt < duration_to_water:
+                logger.debug(f"waiting {duration_to_water - dt}s to send water volume commands")
+                time.sleep(duration_to_water - dt)
 
             if water_volume != self.water_volume_param[1]:
                 logger.debug("sending water volume commands")
-                self.__reach_value__(self.water_volume_param[1], water_volume, self.water_volume_param[3])
+                self.__reach_value__(self.water_volume_param[1], water_volume, self.water_volume_param[3],
+                                     action_cooldown)
 
             # TODO use cs to detect end
             return True
