@@ -102,14 +102,26 @@ class CoffeeMaker:
         """
         self.connection.write(JuraCommand.BUTTON_2)
 
+    def less(self) -> bool:
+        resp =  self.connection.write_with_response(JuraCommand.BUTTON_2)
+        return resp == "ok:"
+
     def __more__(self):
         """
         A subsequent call to self.connection.read() must be done to receive the acknowledgment
         """
         self.connection.write(JuraCommand.BUTTON_5)
 
+    def more(self) -> bool:
+        resp =  self.connection.write_with_response(JuraCommand.BUTTON_5)
+        return resp == "ok:"
+
     def __stop__(self):
         """
         A subsequent call to self.connection.read() must be done to receive the acknowledgment
         """
         self.connection.write(JuraCommand.BUTTON_6)
+
+    def stop(self) -> bool:
+        resp =  self.connection.write_with_response(JuraCommand.BUTTON_6)
+        return resp == "ok:"

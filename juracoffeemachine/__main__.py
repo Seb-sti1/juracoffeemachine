@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('port', default='/dev/ttyUSB0', help='Serial port (default: /dev/ttyUSB0)')
-    parser.add_argument('action', choices=["hz", "cs", "stat", "while_hz", "while_cs", "brew_coffee", "eeprom"],
+    parser.add_argument('action', choices=["hz", "cs", "stat",
+                                           "while_hz", "while_cs",
+                                           "brew_coffee",
+                                           "more", "less", "stop",
+                                           "eeprom"],
                         help='What should be done')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable debug output')
     args = parser.parse_args()
@@ -46,6 +50,12 @@ def main():
             logger.info(f"{msg.raw}: {msg}")
     elif args.action == "brew_coffee":
         machin.brew_coffee(machin.CoffeeType.COFFEE, 2, 100)
+    elif args.action == "more":
+        logger.info("Button acknowledge" if machin.more() else "Sent but not acknowledge")
+    elif args.action == "less":
+        logger.info("Button acknowledge" if machin.less() else "Sent but not acknowledge")
+    elif args.action == "stop":
+        logger.info("Button acknowledge" if machin.stop() else "Sent but not acknowledge")
     elif args.action == "eeprom":
         machin.connection.dump_eeprom_to_file(Path(f"./eeprom{int(time.time())}.dump"))
     machin.connection.__serial__.close()
