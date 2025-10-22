@@ -3,7 +3,7 @@ import threading
 import time
 from enum import StrEnum, Enum
 from pathlib import Path
-from typing import List, Optional, Callable, overload
+from typing import List, Optional, Callable, overload, Tuple
 
 from juracoffeemachine.response import HZ, CS, IC, Response
 from juracoffeemachine.serial import CircularBuffer, AbstractSerial
@@ -30,6 +30,12 @@ class JuraAddress(Enum):
     # DAILY_2_COFFEE = ?
     DAILY_SPECIAL = 0x188
     DAILY_HOT_WATER = 0x18D
+
+    # default parameter for brewing a coffee
+    # for some unknown reason the bean quantity seems duplicated
+    PARAM_COFFEE_BEAN_Q1 = 0xD0
+    PARAM_COFFEE_BEAN_Q2 = 0x13C
+    PARAM_COFFEE_WATER_V = 0xD6  # probably something else
 
 
 class JuraCommand(StrEnum):
@@ -63,6 +69,7 @@ class JuraCommand(StrEnum):
     # read from eeprom. address is 2 bytes hex in uppercase. last address is 0x3FF.
     RE = "RE:"  # read 2 bytes from eeprom
     RT = "RT:"  # read 32 bytes from eeprom
+    # WE:{:04X},{:04X}
 
     CS = "CS:"
     HZ = "HZ:"
@@ -111,6 +118,11 @@ class JuraProtocol:
     def log_statistics(self):
         for a in JuraAddress:
             logger.info(f"{a.name}: {int(self.read_eeprom(int(a.value)), 16)}")
+
+    def get_coffee_param(self) -> Tuple[str, str, str]:
+        return (self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q1.value)),
+                self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q2.value)),
+                self.read_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value)))
 
     def read_eeprom(self, address: int, use_rt: bool = False) -> str:
         address_str = hex(address)[2:].rjust(4).replace(' ', '0').upper()

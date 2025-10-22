@@ -40,6 +40,11 @@ def main():
         logger.info(f"{msg.raw}: {msg}")
     elif args.action == "stat":
         machin.connection.log_statistics()
+    elif args.action == "coffee_param":
+        q1, q2, v = machin.connection.get_coffee_param()
+        logger.info(f"q1 {q1} {int(q1, 16)}")
+        logger.info(f"q2 {q2} {int(q2, 16)}")
+        logger.info(f"v {v} {int(v, 16)}")
     elif args.action == "while_hz":
         while True:
             msg = machin.connection.get_and_parse_message(JuraCommand.HZ)
