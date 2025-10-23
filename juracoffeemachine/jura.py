@@ -69,7 +69,7 @@ class JuraCommand(StrEnum):
     # read from eeprom. address is 2 bytes hex in uppercase. last address is 0x3FF.
     RE = "RE:"  # read 2 bytes from eeprom
     RT = "RT:"  # read 32 bytes from eeprom
-    # WE:{:04X},{:04X}
+    WE = "WE:"  # write 2 bytes to eeprom. format is WE:AAAA,DDDD where A is the address, D is the data
 
     CS = "CS:"
     HZ = "HZ:"
@@ -124,8 +124,23 @@ class JuraProtocol:
                 self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q2.value)),
                 self.read_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value)))
 
+    @staticmethod
+    def __int_to_hex_str__(value: int) -> str:
+        return hex(value)[2:].rjust(4).replace(' ', '0').upper()
+
+    def write_eeprom(self, address: int, data: int) -> bool:
+        if address >= 0x400:
+            return False
+        if data >= 0x10000:
+            return False
+        address_str = self.__int_to_hex_str__(address)
+        data_str = self.__int_to_hex_str__(data)
+        cmd = f"{JuraCommand.WE}{address_str},{data_str}"
+        r = self.write_with_response(cmd)
+        return r == "ok:"
+
     def read_eeprom(self, address: int, use_rt: bool = False) -> str:
-        address_str = hex(address)[2:].rjust(4).replace(' ', '0').upper()
+        address_str = self.__int_to_hex_str__(address)
         cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address_str}"
         r = self.write_with_response(cmd)
         return r.split(":")[-1]
