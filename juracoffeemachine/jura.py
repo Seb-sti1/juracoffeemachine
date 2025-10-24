@@ -129,9 +129,9 @@ class JuraProtocol:
         return hex(value)[2:].rjust(4).replace(' ', '0').upper()
 
     def write_eeprom(self, address: int, data: int) -> bool:
-        if address >= 0x400:
+        if address < 0 or address >= 0x400:
             return False
-        if data >= 0x10000:
+        if data < 0 or data >= 0x10000:
             return False
         address_str = self.__int_to_hex_str__(address)
         data_str = self.__int_to_hex_str__(data)
