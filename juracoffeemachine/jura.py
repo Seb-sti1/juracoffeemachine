@@ -32,10 +32,8 @@ class JuraAddress(Enum):
     DAILY_HOT_WATER = 0x18D
 
     # default parameter for brewing a coffee
-    # for some unknown reason the bean quantity seems duplicated
-    PARAM_COFFEE_BEAN_Q1 = 0xD0
-    PARAM_COFFEE_BEAN_Q2 = 0x13C
-    PARAM_COFFEE_WATER_V = 0xD6  # probably something else
+    PARAM_COFFEE_BEAN_Q = 0xD6
+    PARAM_COFFEE_WATER_V = 0x13C
 
 
 class JuraCommand(StrEnum):
@@ -119,16 +117,60 @@ class JuraProtocol:
         for a in JuraAddress:
             logger.info(f"{a.name}: {int(self.read_eeprom(int(a.value)), 16)}")
 
-    def get_coffee_param(self) -> Tuple[str, str, str]:
-        return (self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q1.value)),
-                self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q2.value)),
+    def __get_raw_coffee_param__(self) -> Tuple[Optional[str], Optional[str]]:
+        return (self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value)),
                 self.read_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value)))
+
+    def get_coffee_param(self) -> Tuple[Optional[int], Optional[int]]:
+        """
+        :return: (number of coffee bean as per jura's gui, water volume in mL*)
+        """
+        raw = self.__get_raw_coffee_param__()
+        return (None if raw[0] is None else int(raw[0], 16) >> 4,
+                None if raw[1] is None else int(raw[1], 16) * 5)
+
+    def set_coffee_param(self, coffee_bean: int, water_volume: int) -> bool:
+        """
+        BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
+
+        :param coffee_bean: the quantity of coffee
+        :param water_volume: the water volume
+        :return: if it is possible and succeeded
+        """
+        current_q, current_v = self.__get_raw_coffee_param__()
+        if current_q is None:
+            logger.error(f"current_q is None")
+            return False
+        current_q = int(current_q, 16)
+        current_v = int(current_v, 16)
+        if coffee_bean < 0 or coffee_bean > 7:
+            return False
+        if water_volume < 5 or water_volume > 0x30:
+            return False
+        new_q = (current_q & 0b1111111100001111) | (coffee_bean << 4)
+        new_v = water_volume
+        if current_q == new_q and current_v == new_v:
+            return True
+        elif current_q == new_q:
+            return self.write_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v)
+        elif current_v == new_v:
+            return self.write_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q)
+        else:
+            return (self.write_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q) and
+                    self.write_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v))
 
     @staticmethod
     def __int_to_hex_str__(value: int) -> str:
         return hex(value)[2:].rjust(4).replace(' ', '0').upper()
 
     def write_eeprom(self, address: int, data: int) -> bool:
+        """
+        BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
+
+        :param address: where to write data
+        :param data: the data to write to the eeprom
+        :return: if it is possible and succeeded
+        """
         if address < 0 or address >= 0x400:
             return False
         if data < 0 or data >= 0x10000:
@@ -139,11 +181,11 @@ class JuraProtocol:
         r = self.write_with_response(cmd)
         return r == "ok:"
 
-    def read_eeprom(self, address: int, use_rt: bool = False) -> str:
+    def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[str]:
         address_str = self.__int_to_hex_str__(address)
         cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address_str}"
         r = self.write_with_response(cmd)
-        return r.split(":")[-1]
+        return None if r is None else r.split(":")[-1]
 
     def dump_eeprom(self) -> str:
         mem = ""

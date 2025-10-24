@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from enum import IntEnum
 
 from juracoffeemachine.jura import JuraProtocol, JuraCommand
@@ -27,7 +26,7 @@ class CoffeeMaker:
 
     # min, initial, max, step
     coffee_bean_param = (0, 3, 7, 1)
-    water_volume_param = (80, 100, 150, 5)
+    water_volume_param = (25, 100, 240, 5)
 
     def __init__(self, protocol: JuraProtocol):
         self.connection: JuraProtocol = protocol
@@ -51,77 +50,34 @@ class CoffeeMaker:
         logger.error(f"Receive wrong acknowledgement {result}")
         return False
 
-    def __reach_value__(self, initial: int, goal: int, step: int,
-                        action_cooldown: float):
-        logger.debug(f"doing {abs(goal - initial) // step} button push")
-        to_send = abs(goal - initial) // step
-        tries = 3
-        while tries > 0 and to_send > 0:
-            tries -= 1
-            for _ in range(0, to_send):
-                logger.debug("sending cmd" + ("less" if goal < initial else "more"))
-                self.__less__() if goal < initial else self.__more__()
-                time.sleep(action_cooldown)
+    def brew_coffee(self, coffee_bean: int, water_volume: int) -> bool:
+        """
+        BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
-            for _ in range(0, to_send):
-                if self.connection.read() == "ok:":
-                    to_send -= 1
-        logger.debug(f"done. to_send left {to_send} (should be 0).")
-
-    def brew_coffee(self, coffee: CoffeeType, coffee_bean: int, water_volume: int,
-                    wait_before_coffee: float = 0.6, duration_to_water: float = 6,  # TODO try new timings
-                    action_cooldown: float = 0.1) -> bool:
-        coffee_bean = max(self.coffee_bean_param[0], min(self.coffee_bean_param[2], coffee_bean))
-        water_volume = max(self.water_volume_param[0], min(self.water_volume_param[2], water_volume))
-        if self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[coffee]):
-            dt = time.time()
-            time.sleep(wait_before_coffee)
-            if coffee_bean != self.coffee_bean_param[1]:
-                logger.debug("sending coffee commands")
-                self.__reach_value__(self.coffee_bean_param[1], coffee_bean, self.coffee_bean_param[3],
-                                     action_cooldown)
-
-            # TODO use cs to detect when to send water volume commands?
-            dt = time.time() - dt
-            if dt < duration_to_water:
-                logger.debug(f"waiting {duration_to_water - dt}s to send water volume commands")
-                time.sleep(duration_to_water - dt)
-
-            if water_volume != self.water_volume_param[1]:
-                logger.debug("sending water volume commands")
-                self.__reach_value__(self.water_volume_param[1], water_volume, self.water_volume_param[3],
-                                     action_cooldown)
-
-            # TODO use cs to detect end
-            return True
+        :param coffee_bean: the number of bean (= [jura's gui] - 1)
+        :param water_volume: the water volume in mL
+        :return: if it is possible and succeeded
+        """
+        coffee_bean = max(self.coffee_bean_param[0],
+                          min(self.coffee_bean_param[2], coffee_bean)) // self.coffee_bean_param[3]
+        water_volume = max(self.water_volume_param[0],
+                           min(self.water_volume_param[2], water_volume)) // self.water_volume_param[3]
+        if self.connection.set_coffee_param(coffee_bean, water_volume):
+            if self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]):
+                # TODO use cs when sending water and to detect end
+                return True
         return False
 
-    def __less__(self):
+    def reset_coffee_param(self) -> bool:
         """
-        A subsequent call to self.connection.read() must be done to receive the acknowledgment
-        """
-        self.connection.write(JuraCommand.BUTTON_2)
+        BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
-    def less(self) -> bool:
-        resp =  self.connection.write_with_response(JuraCommand.BUTTON_2)
-        return resp == "ok:"
+        Reset coffee default parameters to actual default
 
-    def __more__(self):
+        :return: if it is possible and succeeded
         """
-        A subsequent call to self.connection.read() must be done to receive the acknowledgment
-        """
-        self.connection.write(JuraCommand.BUTTON_5)
-
-    def more(self) -> bool:
-        resp =  self.connection.write_with_response(JuraCommand.BUTTON_5)
-        return resp == "ok:"
-
-    def __stop__(self):
-        """
-        A subsequent call to self.connection.read() must be done to receive the acknowledgment
-        """
-        self.connection.write(JuraCommand.BUTTON_6)
+        return self.connection.set_coffee_param(self.coffee_bean_param[1], self.water_volume_param[1])
 
     def stop(self) -> bool:
-        resp =  self.connection.write_with_response(JuraCommand.BUTTON_6)
+        resp = self.connection.write_with_response(JuraCommand.BUTTON_6)
         return resp == "ok:"
