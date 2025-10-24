@@ -38,9 +38,9 @@ class CoffeeMaker:
 
     @staticmethod
     def create_from_uart(port: str) -> CoffeeMaker:
-        return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _:None))
-                                        # lambda b: b.dump(os.path.join(os.path.dirname(__file__),
-                                        #                               str(int(time.time()))))))
+        return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _: None))
+        # lambda b: b.dump(os.path.join(os.path.dirname(__file__),
+        #                               str(int(time.time()))))))
 
     def __send_command_and_wait_for_acknowledgement__(self, command: str):
         self.connection.write(command)
@@ -76,7 +76,8 @@ class CoffeeMaker:
 
         :return: if it is possible and succeeded
         """
-        return self.connection.set_coffee_param(self.coffee_bean_param[1], self.water_volume_param[1])
+        return self.connection.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
+                                                self.water_volume_param[1] // self.water_volume_param[3])
 
     def stop(self) -> bool:
         resp = self.connection.write_with_response(JuraCommand.BUTTON_6)

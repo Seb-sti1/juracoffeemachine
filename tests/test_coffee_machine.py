@@ -117,3 +117,29 @@ def test_brew_less_coffee_and_water_valid():
 
     assert t.read_index == len(t.read_buffer)
     assert t.write_buffer == write_buffer
+
+
+def test_reset_coffee_param_valid():
+    t = ValidSerial()
+    write_buffer = encode_str("TY:")
+    t.read_buffer = encode_str("ty:EF532M V02.03")
+    write_buffer += encode_str("TL:")
+    t.read_buffer += encode_str("tl:BL_RL78 V01.31")
+    write_buffer += encode_str("RE:00D6")
+    t.read_buffer += encode_str("re:0041")
+    write_buffer += encode_str("RE:013C")
+    t.read_buffer += encode_str("re:0015")
+    write_buffer += encode_str("WE:00D6,0031")
+    t.read_buffer += encode_str("ok:")
+    write_buffer += encode_str("WE:013C,0014")
+    t.read_buffer += encode_str("ok:")
+
+    def callback():
+        assert False
+
+    p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
+    m = CoffeeMaker(p)
+    m.reset_coffee_param()
+
+    assert t.read_index == len(t.read_buffer)
+    assert t.write_buffer == write_buffer
