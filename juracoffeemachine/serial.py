@@ -29,6 +29,12 @@ class AbstractSerial:
     def get_debug_buffer(self) -> CircularBuffer:
         raise NotImplemented("This is an abstract method")
 
+    def reopen(self):
+        raise NotImplemented("This is an abstract method")
+
+    def reset_streams(self):
+        raise NotImplemented("This is an abstract method")
+
     def close(self):
         raise NotImplemented("This is an abstract method")
 
@@ -46,9 +52,8 @@ class JuraSerial(AbstractSerial):
     def __init__(self, device: str, circular_debug_buffer_size: int = 5000):
         super().__init__()
         self.device = device
-        self.__serial__ = serial.Serial()
-        self.__open_serial__()
-        self.buffer = CircularBuffer(circular_debug_buffer_size)
+        self.circular_debug_buffer_size = circular_debug_buffer_size
+        self.__open__()
 
     def __open_serial__(self):
         try:
@@ -69,8 +74,22 @@ class JuraSerial(AbstractSerial):
             logger.error(f"Failed to open or configure '{self.device}': {e}")
             raise RuntimeError(f"Failed to open or configure '{self.device}': {e}")
 
+    def __open__(self):
+        self.__serial__ = serial.Serial()
+        self.__open_serial__()
+        self.buffer = CircularBuffer(self.circular_debug_buffer_size)
+
     def get_debug_buffer(self) -> CircularBuffer:
         return self.buffer
+
+    def reopen(self):
+        self.flush()
+        self.close()
+        self.__open__()
+
+    def reset_streams(self):
+        self.__serial__.reset_input_buffer()
+        self.__serial__.reset_output_buffer()
 
     def close(self):
         if self.__serial__.is_open:

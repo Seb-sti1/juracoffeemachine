@@ -86,6 +86,12 @@ class JuraProtocol:
         self.actionLock = threading.Lock()
         self.unexpected_msg_callback = unexpected_msg_callback
 
+    def reopen_serial(self):
+        self.__serial__.reopen()
+
+    def reset_streams(self):
+        self.__serial__.reset_streams()
+
     @overload
     def get_and_parse_message(self, command: JuraCommand.HZ, raw: Optional[str] = None) -> Optional[HZ]:
         ...
