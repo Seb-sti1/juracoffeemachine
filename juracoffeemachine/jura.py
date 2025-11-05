@@ -1,4 +1,5 @@
 import logging
+import re
 import threading
 import time
 from enum import StrEnum, Enum
@@ -9,6 +10,19 @@ from juracoffeemachine.response import HZ, CS, IC, Response
 from juracoffeemachine.serial import CircularBuffer, AbstractSerial
 
 logger = logging.getLogger(__name__)
+
+RESPONSE_PATTERN = re.compile(r"^[a-zA-Z0-9:, ._]+$")
+
+
+class EmptyResponse(RuntimeError):
+    def __init__(self):
+        super()
+
+
+class InvalidResponse(RuntimeError):
+    def __init__(self, content):
+        super()
+        self.content = content
 
 
 class JuraAddress(Enum):
@@ -197,7 +211,7 @@ class JuraProtocol:
         mem = ""
         address = 0
         while address < 0x400:
-            r = self.read_eeprom(address, True)
+            r = self.read_eeprom(address, True)  # TODO handle errors
             logger.debug(f"{hex(address).ljust(6)} -> {r}")
             mem += r
             address += 16
@@ -277,17 +291,27 @@ class JuraProtocol:
     def read(self, end_separator: str = "\r\n", timeout: float = 3, wait: float = 0.5) -> str:
         self.actionLock.acquire()
         result = []
+        buffer = []
+        empty = True
         start = time.time()
         while not "".join(result).endswith(end_separator) and (time.time() - start) < timeout:
-            buffer = self.__serial__.read(4)
+            # always try and read chunk of 4 bytes
+            # as this is required to decode one char
+            buffer += self.__serial__.read(4 - len(buffer))
+            empty = len(buffer) == 0 and empty
             if len(buffer) == 4:
-                decoded = self.decode(list(buffer))
+                decoded = self.decode(buffer)
                 result.append(chr(decoded))
+                buffer = []
             else:
-                logger.warning(f"Returned too small buffer ({len(buffer)})")
                 time.sleep(wait)
         self.actionLock.release()
-        return "".join(result).strip()
+        if empty:
+            raise EmptyResponse()
+        r = "".join(result).strip()
+        if not RESPONSE_PATTERN.fullmatch(r):
+            raise InvalidResponse(r)
+        return r
 
     def write_with_response(self, data: str, timeout: float = 3) -> Optional[str]:
         if self.write(data):
