@@ -29,10 +29,11 @@ class CoffeeMaker:
     water_volume_param = (25, 100, 240, 5)
 
     def __init__(self, protocol: JuraProtocol):
-        self.connection: JuraProtocol = protocol
-        response = self.connection.write_with_response(JuraCommand.GET_TYPE, 1.0)
-        assert response == "ty:EF532M V02.03", f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
-        response = self.connection.write_with_response(JuraCommand.GET_LOADER, 1.0)
+        self.jura: JuraProtocol = protocol
+        self.type = "ty:EF532M V02.03"
+        response = self.jura.write_with_response(JuraCommand.GET_TYPE)
+        assert response == self.type, f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
+        response = self.jura.write_with_response(JuraCommand.GET_LOADER)
         assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
         logger.info("Coffee Maker connected.")
 
@@ -41,14 +42,6 @@ class CoffeeMaker:
         return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _: None))
         # lambda b: b.dump(os.path.join(os.path.dirname(__file__),
         #                               str(int(time.time()))))))
-
-    def __send_command_and_wait_for_acknowledgement__(self, command: str):
-        self.connection.write(command)
-        result = self.connection.read()
-        if result == "ok:":
-            return True
-        logger.error(f"Receive wrong acknowledgement {result}")
-        return False
 
     def brew_coffee(self, coffee_bean: int, water_volume: int) -> bool:
         """
@@ -62,8 +55,8 @@ class CoffeeMaker:
                           min(self.coffee_bean_param[2], coffee_bean)) // self.coffee_bean_param[3]
         water_volume = max(self.water_volume_param[0],
                            min(self.water_volume_param[2], water_volume)) // self.water_volume_param[3]
-        if self.connection.set_coffee_param(coffee_bean, water_volume):
-            if self.__send_command_and_wait_for_acknowledgement__(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]):
+        if self.jura.set_coffee_param(coffee_bean, water_volume):
+            if self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) == "ok:":
                 # TODO use cs when sending water and to detect end
                 return True
         return False
@@ -76,9 +69,8 @@ class CoffeeMaker:
 
         :return: if it is possible and succeeded
         """
-        return self.connection.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
-                                                self.water_volume_param[1] // self.water_volume_param[3])
+        return self.jura.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
+                                          self.water_volume_param[1] // self.water_volume_param[3])
 
     def stop(self) -> bool:
-        resp = self.connection.write_with_response(JuraCommand.BUTTON_6)
-        return resp == "ok:"
+        return self.jura.write_with_response(JuraCommand.BUTTON_6) == "ok:"
