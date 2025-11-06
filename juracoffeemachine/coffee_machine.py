@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import time
 from enum import IntEnum, Enum
-from typing import Optional, overload
+from typing import Optional, overload, Tuple
 
-from juracoffeemachine.jura import JuraProtocol, JuraCommand, HZ, CS, IC, EmptyResponse, InvalidResponse
+from juracoffeemachine.jura import JuraProtocol, JuraCommand, HZ, CS, IC, EmptyResponse, InvalidResponse, Response
 from juracoffeemachine.serial import JuraSerial
 
 logger = logging.getLogger(__name__)
@@ -49,37 +49,42 @@ class CoffeeMaker:
         logger.info("Coffee Maker connected.")
 
     def __update_status__(self, new_status):
-        self.status = (time.time(), new_status)
+        self.__status__ = (time.time(), new_status)
+
+    def get_last_status(self) -> Tuple[float, MakerStatus]:
+        return self.__status__
 
     def test_and_reconnect(self, _tries=3) -> bool:
-        logger.info("Testing coffee maker connection")
+        if _tries == 3:
+            logger.info(f"Testing coffee maker connection")
         is_invalid = False
         try:
             t = self.jura.write_with_response(JuraCommand.GET_TYPE)
             if t == self.type:
                 self.__update_status__(MakerStatus.CONNECTED)
+                logger.info("Connection recovered")
                 return True
             else:
-                logger.warning(f"Received invalid response: {t} != {self.type}")
+                logger.info(f"Received invalid response {t} != {self.type}")
                 is_invalid = True
         except EmptyResponse:
-            logger.warning("Received empty response")
+            logger.info("Received empty response")
             self.__update_status__(MakerStatus.OFF)
         except InvalidResponse as e:
-            logger.warning(f"Received invalid response: {e}")
+            logger.info(f"Received invalid response {e}")
             is_invalid = True
         finally:
             if is_invalid:
                 self.__update_status__(MakerStatus.DESYNCHRONISED)
                 if _tries > 0:
-                    logger.warning(f"Trying to reset buffers/reopened stream")
+                    logger.info(f"Trying to reset buffers/reopened stream")
                     if _tries == 3:
                         self.jura.reset_streams()
                     else:
                         self.jura.reopen_serial()
                     return self.test_and_reconnect(_tries=_tries - 1)
                 else:
-                    logger.warning(f"Reached maximum number of tries")
+                    logger.error(f"Reached maximum number of tries")
         return False
 
     @staticmethod
@@ -101,9 +106,11 @@ class CoffeeMaker:
         ...
 
     def ping(self, command: JuraCommand) -> Optional[Response]:
-        logger.debug(f"Current status is {self.status}")
+        logger.debug(f"Current status is {self.__status__}")
         try:
-            return self.jura.get_and_parse_message(command)
+            r = self.jura.get_and_parse_message(command)
+            self.__update_status__(MakerStatus.CONNECTED)
+            return r
         except EmptyResponse:
             logger.debug(f"Received empty response")
             self.test_and_reconnect()
@@ -119,8 +126,8 @@ class CoffeeMaker:
         :param water_volume: the water volume in mL
         :return: if it is possible and succeeded
         """
-        if not self.test_and_reconnect() or self.status[1] != MakerStatus.CONNECTED:
-            logger.fatal(f"Machine is not connected ({self.status}), cannot brew_coffee")
+        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+            logger.fatal(f"Machine is not connected ({self.__status__}), cannot brew_coffee")
             return False
 
         try:
@@ -146,8 +153,8 @@ class CoffeeMaker:
 
         :return: if it is possible and succeeded
         """
-        if not self.test_and_reconnect() or self.status[1] != MakerStatus.CONNECTED:
-            logger.fatal(f"Machine is not connected ({self.status}), cannot reset_coffee_param")
+        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+            logger.fatal(f"Machine is not connected ({self.__status__}), cannot reset_coffee_param")
             return False
 
         try:
@@ -160,8 +167,8 @@ class CoffeeMaker:
         return False
 
     def stop(self) -> bool:
-        if not self.test_and_reconnect() or self.status[1] != MakerStatus.CONNECTED:
-            logger.fatal(f"Machine is not connected ({self.status}), cannot stop")
+        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+            logger.fatal(f"Machine is not connected ({self.__status__}), cannot stop")
             return False
 
         try:
