@@ -178,3 +178,16 @@ class CoffeeMaker:
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to stop")
         return False
+
+    def get_totals_statistics(self) -> Optional[Tuple[int, int, int, int, int, int, int]]:
+        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+            logger.fatal(f"Machine is not connected ({self.__status__}), cannot get_totals_statistics")
+            return None
+
+        try:
+            return self.jura.get_totals_statistics()
+        except EmptyResponse:
+            logger.fatal(f"Received empty response while trying to get_totals_statistics")
+        except InvalidResponse as e:
+            logger.fatal(f"Received invalid response: {e} while trying to get_totals_statistics")
+        return None
