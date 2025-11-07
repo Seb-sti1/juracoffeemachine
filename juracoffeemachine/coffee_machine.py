@@ -137,7 +137,32 @@ class CoffeeMaker:
                                min(self.water_volume_param[2], water_volume)) // self.water_volume_param[3]
             if self.jura.set_coffee_param(coffee_bean, water_volume):
                 if self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) == "ok:":
-                    # TODO use cs when sending water and to detect end
+                    logger.info(f"Brewing {coffee_bean} beans {water_volume} * 5 mL")
+                    start_time = time.time()
+                    end_detected = False
+                    last_water_sensor_values = [0, 0, 0]
+
+                    while (time.time() - start_time) < 120 or end_detected:
+                        cs = None
+                        try:
+                            cs = self.jura.get_and_parse_message(JuraCommand.CS)
+                        except EmptyResponse:
+                            logger.warning(f"Received empty response")
+                        except InvalidResponse as e:
+                            logger.warning(f"Received invalid response: {e}")
+
+                        if cs is None:
+                            logger.warning(f"Received cs == None")
+                        else:
+                            last_water_sensor_values.append(cs.water_vol)
+                            last_water_sensor_values = last_water_sensor_values[0:3]
+                            end_detected = last_water_sensor_values[0] != 0 and \
+                                           all(v == [last_water_sensor_values] for v in last_water_sensor_values)
+                            logger.info(f"last water sensor: {last_water_sensor_values}, end_detected: {end_detected}")
+                    if end_detected:
+                        logger.info(f"Coffee was brewed!")
+                    else:
+                        logger.warning(f"Coffee ending could not be detected.")
                     return True
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to brew_coffee")
