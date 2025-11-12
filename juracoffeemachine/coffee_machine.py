@@ -157,7 +157,7 @@ class CoffeeMaker:
                             last_water_sensor_values.append(cs.water_vol)
                             last_water_sensor_values = last_water_sensor_values[1:4]
                             end_detected = last_water_sensor_values[0] != 0 and \
-                                           all(v == [last_water_sensor_values] for v in last_water_sensor_values)
+                                           all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
                             logger.info(f"last water sensor: {last_water_sensor_values}, end_detected: {end_detected}")
                     if end_detected:
                         logger.info(f"Coffee was brewed!")
