@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from enum import IntEnum, Enum
-from typing import Optional, overload, Tuple
+from typing import Optional, overload, Tuple, Callable
 
 from juracoffeemachine.jura import JuraProtocol, JuraCommand, HZ, CS, IC, EmptyResponse, InvalidResponse, Response
 from juracoffeemachine.serial import JuraSerial
@@ -36,6 +36,7 @@ class CoffeeMaker:
     # min, initial, max, step
     coffee_bean_param = (0, 3, 7, 1)
     water_volume_param = (25, 100, 240, 5)
+    water_sensor_to_water_value = 2.18595512820513
 
     def __init__(self, protocol: JuraProtocol):
         self.jura: JuraProtocol = protocol
@@ -119,12 +120,13 @@ class CoffeeMaker:
             self.test_and_reconnect()
         # TODO needs to decide what needs to be done when it recovers the machine from a except
 
-    def brew_coffee(self, coffee_bean: int, water_volume: int) -> bool:
+    def brew_coffee(self, coffee_bean: int, water_volume: int, progress_cb: Callable[[int], None]) -> bool:
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
         :param coffee_bean: the number of bean (= [jura's gui] - 1)
         :param water_volume: the water volume in mL
+        :param progress_cb: callback with an approximation of how much water has flown
         :return: if it is possible and succeeded
         """
         if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
@@ -159,9 +161,10 @@ class CoffeeMaker:
                             last_water_sensor_values = last_water_sensor_values[1:4]
                             end_detected = last_water_sensor_values[0] != 0 and \
                                            all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
-                            logger.info(f"last water sensor: {last_water_sensor_values}, end_detected: {end_detected}")
+                            progress_cb(int(last_water_sensor_values[-1] / self.water_sensor_to_water_value))
                     if end_detected:
                         logger.info(f"Coffee was brewed!")
+                        logger.warning(f"last water sensor: {last_water_sensor_values}")
                     else:
                         logger.warning(f"Coffee ending could not be detected.")
                     return True
