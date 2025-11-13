@@ -117,6 +117,7 @@ class CoffeeMaker:
         except InvalidResponse as e:
             logger.debug(f"Received invalid response: {e}")
             self.test_and_reconnect()
+        # TODO needs to decide what needs to be done when it recovers the machine from a except
 
     def brew_coffee(self, coffee_bean: int, water_volume: int) -> bool:
         """
@@ -142,7 +143,7 @@ class CoffeeMaker:
                     end_detected = False
                     last_water_sensor_values = [0, 0, 0]
 
-                    while (time.time() - start_time) < 120 or end_detected:
+                    while (time.time() - start_time) < 120 and not end_detected:
                         cs = None
                         try:
                             cs = self.jura.get_and_parse_message(JuraCommand.CS)
