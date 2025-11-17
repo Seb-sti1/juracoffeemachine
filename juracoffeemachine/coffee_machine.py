@@ -139,7 +139,7 @@ class CoffeeMaker:
                     while (time.time() - start_time) < 120 and not end_detected:
                         cs = None
                         try:
-                            cs = self.jura.get_and_parse_message(JuraCommand.CS)
+                            cs = await self.jura.get_and_parse_message(JuraCommand.CS)
                         except EmptyResponse:
                             logger.warning(f"Received empty response")
                         except InvalidResponse as e:
