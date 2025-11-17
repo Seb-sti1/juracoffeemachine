@@ -97,6 +97,18 @@ class CoffeeMaker:
         # lambda b: b.dump(os.path.join(os.path.dirname(__file__),
         #                               str(int(time.time()))))))
 
+    @overload
+    async def ping(self, command: JuraCommand.HZ) -> Optional[HZ]:
+        ...
+
+    @overload
+    async def ping(self, command: JuraCommand.CS) -> Optional[CS]:
+        ...
+
+    @overload
+    async def ping(self, command: JuraCommand.IC) -> Optional[IC]:
+        ...
+
     async def ping(self, command: JuraCommand) -> Optional[Response]:
         logger.debug(f"Current status is {self.__status__}")
         try:
