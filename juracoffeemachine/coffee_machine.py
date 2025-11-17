@@ -160,6 +160,7 @@ class CoffeeMaker:
                         if cs is None:
                             logger.warning(f"Received cs == None")
                         else:
+                            logger.warning(f"last_water_sensor_values {last_water_sensor_values}.")
                             last_water_sensor_values.append(cs.water_vol)
                             last_water_sensor_values = last_water_sensor_values[1:4]
                             end_detected = last_water_sensor_values[0] != 0 and \
