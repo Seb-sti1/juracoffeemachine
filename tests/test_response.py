@@ -10,8 +10,8 @@ def encode_str(data) -> list[int]:
         encoded += JuraProtocol.encode(ord(c))  # tested in test_jura.py
     return encoded
 
-
-def test_valid_hz():
+@pytest.mark.asyncio
+async def test_valid_hz():
     t = ValidSerial()
     t.read_buffer = encode_str("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12")
 
@@ -19,7 +19,7 @@ def test_valid_hz():
         assert False
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
-    hz = p.get_and_parse_message(JuraCommand.HZ)
+    hz = await p.get_and_parse_message(JuraCommand.HZ)
     assert isinstance(hz, HZ)
     assert t.read_index == len(t.read_buffer)
 
@@ -32,8 +32,8 @@ def test_valid_hz():
     assert hz.is_draining_tray_present
     assert not hz.is_draining_tray_full
 
-
-def test_wrong_static_hz():
+@pytest.mark.asyncio
+async def test_wrong_static_hz():
     t = ValidSerial()
     t.read_buffer = encode_str("hz:00010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,13")
     callback_called = [False]
@@ -42,7 +42,11 @@ def test_wrong_static_hz():
         callback_called[0] = True
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
-    hz = p.get_and_parse_message(JuraCommand.HZ)
+    hz = await p.get_and_parse_message(JuraCommand.HZ)
+
+    def callback():
+        assert False
+
     assert isinstance(hz, HZ)
     assert callback_called[0]
     assert t.read_index == len(t.read_buffer)
@@ -65,7 +69,8 @@ def test_wrong_static_hz():
         "hz:010101100000000288,00ED,0107,03E8,0000,0,0017,000100,12"
     ],
 )
-def test_wrong_format_hz(hz_msg):
+@pytest.mark.asyncio
+async def test_wrong_format_hz(hz_msg):
     t = ValidSerial()
     t.read_buffer = encode_str(hz_msg)
     callback_called = [False]
@@ -74,13 +79,13 @@ def test_wrong_format_hz(hz_msg):
         callback_called[0] = True
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
-    hz = p.get_and_parse_message(JuraCommand.HZ)
+    hz = await p.get_and_parse_message(JuraCommand.HZ)
     assert hz is None
     assert callback_called[0]
     assert t.read_index == len(t.read_buffer)
 
-
-def test_valid_cs():
+@pytest.mark.asyncio
+async def test_valid_cs():
     t = ValidSerial()
     t.read_buffer = encode_str("cs:03770000000ED000000000000006000011C00000000")
 
@@ -88,7 +93,7 @@ def test_valid_cs():
         assert False
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
-    cs = p.get_and_parse_message(JuraCommand.CS)
+    cs = await p.get_and_parse_message(JuraCommand.CS)
     assert isinstance(cs, CS)
     assert t.read_index == len(t.read_buffer)
 
@@ -97,8 +102,8 @@ def test_valid_cs():
     assert cs.heater == 887
     assert not cs.is_water_tank_empty
 
-
-def test_wrong_static_cs():
+@pytest.mark.asyncio
+async def test_wrong_static_cs():
     t = ValidSerial()
     t.read_buffer = encode_str("cs:0377000FF00ED000000000000006000011C00000000")
     callback_called = [False]
@@ -107,7 +112,7 @@ def test_wrong_static_cs():
         callback_called[0] = True
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
-    cs = p.get_and_parse_message(JuraCommand.CS)
+    cs = await p.get_and_parse_message(JuraCommand.CS)
     assert isinstance(cs, CS)
     assert callback_called[0]
     assert t.read_index == len(t.read_buffer)
@@ -124,7 +129,8 @@ def test_wrong_static_cs():
         "cs:03770000000ED000000000000006000011C0000",
     ],
 )
-def test_wrong_format_cs(cs_msg):
+@pytest.mark.asyncio
+async def test_wrong_format_cs(cs_msg):
     t = ValidSerial()
     t.read_buffer = encode_str(cs_msg)
     callback_called = [False]
@@ -133,13 +139,13 @@ def test_wrong_format_cs(cs_msg):
         callback_called[0] = True
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback(c))
-    cs = p.get_and_parse_message(JuraCommand.CS)
+    cs = await p.get_and_parse_message(JuraCommand.CS)
     assert cs is None
     assert callback_called[0]
     assert t.read_index == len(t.read_buffer)
 
-
-def test_valid_ic():
+@pytest.mark.asyncio
+async def test_valid_ic():
     t = ValidSerial()
     t.read_buffer = encode_str("ic:1706")
 
@@ -147,7 +153,7 @@ def test_valid_ic():
         assert False
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
-    ic = p.get_and_parse_message(JuraCommand.IC)
+    ic = await p.get_and_parse_message(JuraCommand.IC)
     assert isinstance(ic, IC)
     assert t.read_index == len(t.read_buffer)
 

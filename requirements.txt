@@ -1,4 +1,7 @@
 pyserial
+asyncio
+
 pytest
+pytest-asyncio
 coverage
 build

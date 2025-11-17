@@ -50,19 +50,21 @@ def test_encode(value, encoded):
         ([127, 127, 127, 127], 255),
     ],
 )
+
 def test_decode(value, encoded):
     assert JuraProtocol.decode(value) == encoded
 
 
-def test_write():
+@pytest.mark.asyncio
+async def test_write():
     t = ValidSerial()
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
 
-    p.write("TY:")
+    await p.write("TY:")
     assert t.write_buffer == [91, 95, 95, 95, 95, 123, 95, 95, 123, 123, 127, 91, 95, 127, 91, 91, 123, 123, 91, 91]
 
-
-def test_read():
+@pytest.mark.asyncio
+async def test_read():
     t = ValidSerial()
     t.read_buffer = [91, 95, 127, 95, 95, 123, 127, 95, 123, 123, 127, 91, 95, 95, 91, 95, 123, 95, 91, 95, 95, 95, 127,
                      91, 127, 91, 127, 91, 123, 91, 127, 91, 95, 127, 91, 95, 91, 91, 123, 91, 123, 95, 95, 95, 91, 91,
@@ -71,27 +73,27 @@ def test_read():
                      91, 91]
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
 
-    assert p.read() == "ty:EF532M V02.03"
+    assert await p.read() == "ty:EF532M V02.03"
 
-
-def test_write_with_response():
+@pytest.mark.asyncio
+async def test_write_with_response():
     t = ValidSerial()
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
     t.read_buffer = [127, 127, 123, 95, 127, 123, 123, 95, 123, 123, 127, 91, 95, 127, 91, 91, 123, 123, 91, 91]
 
-    resp = p.write_with_response(JuraCommand.BUTTON_1)
+    resp = await p.write_with_response(JuraCommand.BUTTON_1)
     assert t.write_buffer == [123, 95, 91, 95, 95, 91, 91, 95, 123, 123, 127, 91, 91, 91, 127, 91, 91, 95, 127, 91,
                               95, 127, 91, 91, 123, 123, 91, 91]
     assert resp == "ok:"
 
-
-def test_read_eeprom():
+@pytest.mark.asyncio
+async def test_read_eeprom():
     t = ValidSerial()
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
     t.read_buffer = [95, 95, 123, 95, 123, 123, 127, 91, 95, 95, 91, 95, 95, 91, 91, 95, 95, 95, 91, 95, 95, 91, 91, 95,
                      95, 127, 91, 91, 123, 123, 91, 91]
 
-    resp = p.read_eeprom(0x2a3)
+    resp = await p.read_eeprom(0x2a3)
 
     assert t.write_buffer == [123, 91, 95, 95, 95, 95, 91, 95, 123, 123, 127, 91, 91, 91, 127, 91, 123, 91, 127, 91, 95,
                               91, 91, 95, 127, 91, 127, 91, 95, 127, 91, 91, 123, 123, 91, 91]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from enum import IntEnum, Enum
@@ -41,11 +42,13 @@ class CoffeeMaker:
     def __init__(self, protocol: JuraProtocol):
         self.jura: JuraProtocol = protocol
         self.type = "ty:EF532M V02.03"
+        self.tl = "tl:BL_RL78 V01.31"
         self.__update_status__(MakerStatus.NOT_CONNECTED)
-        response = self.jura.write_with_response(JuraCommand.GET_TYPE)
-        assert response == self.type, f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
-        response = self.jura.write_with_response(JuraCommand.GET_LOADER)
-        assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
+        # FIXME check TL for first valid connection
+        # response = await self.jura.write_with_response(JuraCommand.GET_TYPE)
+        # assert response == self.type, f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
+        # response = await self.jura.write_with_response(JuraCommand.GET_LOADER)
+        # assert response == self.tl, f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
         self.__update_status__(MakerStatus.CONNECTED)
         logger.info("Coffee Maker connected.")
 
@@ -55,12 +58,12 @@ class CoffeeMaker:
     def get_last_status(self) -> Tuple[float, MakerStatus]:
         return self.__status__
 
-    def test_and_reconnect(self, _tries=3) -> bool:
+    async def test_and_reconnect(self, _tries=3) -> bool:
         if _tries == 3:
             logger.info(f"Testing coffee maker connection")
         is_invalid = False
         try:
-            t = self.jura.write_with_response(JuraCommand.GET_TYPE)
+            t = await self.jura.write_with_response(JuraCommand.GET_TYPE)
             if t == self.type:
                 self.__update_status__(MakerStatus.CONNECTED)
                 logger.info("Connection recovered")
@@ -83,7 +86,7 @@ class CoffeeMaker:
                         self.jura.reset_streams()
                     else:
                         self.jura.reopen_serial()
-                    return self.test_and_reconnect(_tries=_tries - 1)
+                    return await self.test_and_reconnect(_tries=_tries - 1)
                 else:
                     logger.error(f"Reached maximum number of tries")
         return False
@@ -94,33 +97,21 @@ class CoffeeMaker:
         # lambda b: b.dump(os.path.join(os.path.dirname(__file__),
         #                               str(int(time.time()))))))
 
-    @overload
-    def ping(self, command: JuraCommand.HZ) -> Optional[HZ]:
-        ...
-
-    @overload
-    def ping(self, command: JuraCommand.CS) -> Optional[CS]:
-        ...
-
-    @overload
-    def ping(self, command: JuraCommand.IC) -> Optional[IC]:
-        ...
-
-    def ping(self, command: JuraCommand) -> Optional[Response]:
+    async def ping(self, command: JuraCommand) -> Optional[Response]:
         logger.debug(f"Current status is {self.__status__}")
         try:
-            r = self.jura.get_and_parse_message(command)
+            r = await self.jura.get_and_parse_message(command)
             self.__update_status__(MakerStatus.CONNECTED)
             return r
         except EmptyResponse:
             logger.debug(f"Received empty response")
-            self.test_and_reconnect()
+            await self.test_and_reconnect()
         except InvalidResponse as e:
             logger.debug(f"Received invalid response: {e}")
-            self.test_and_reconnect()
+            await self.test_and_reconnect()
         # TODO needs to decide what needs to be done when it recovers the machine from a except
 
-    def brew_coffee(self, coffee_bean: int, water_volume: int, progress_cb: Callable[[int], None]) -> bool:
+    async def brew_coffee(self, coffee_bean: int, water_volume: int, progress_cb: Callable[[int], None]) -> bool:
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -129,7 +120,7 @@ class CoffeeMaker:
         :param progress_cb: callback with an approximation of how much water has flown
         :return: if it is possible and succeeded
         """
-        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+        if not (await self.test_and_reconnect()) or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot brew_coffee")
             return False
 
@@ -138,8 +129,8 @@ class CoffeeMaker:
                               min(self.coffee_bean_param[2], coffee_bean)) // self.coffee_bean_param[3]
             water_volume = max(self.water_volume_param[0],
                                min(self.water_volume_param[2], water_volume)) // self.water_volume_param[3]
-            if self.jura.set_coffee_param(coffee_bean, water_volume):
-                if self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) == "ok:":
+            if await self.jura.set_coffee_param(coffee_bean, water_volume):
+                if await self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) == "ok:":
                     logger.info(f"Brewing {coffee_bean} beans {water_volume} * 5 mL")
                     start_time = time.time()
                     end_detected = False
@@ -162,6 +153,7 @@ class CoffeeMaker:
                             end_detected = last_water_sensor_values[0] != 0 and \
                                            all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
                             progress_cb(int(last_water_sensor_values[-1] / self.water_sensor_to_water_value))
+                        await asyncio.sleep(0.1)
                     if end_detected:
                         logger.info(f"Coffee was brewed!")
                         logger.warning(f"last water sensor: {last_water_sensor_values}")
@@ -174,7 +166,7 @@ class CoffeeMaker:
             logger.fatal(f"Received invalid response: {e} while trying to brew_coffee")
         return False
 
-    def reset_coffee_param(self) -> bool:
+    async def reset_coffee_param(self) -> bool:
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -182,39 +174,39 @@ class CoffeeMaker:
 
         :return: if it is possible and succeeded
         """
-        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+        if not (await self.test_and_reconnect()) or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot reset_coffee_param")
             return False
 
         try:
-            return self.jura.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
-                                              self.water_volume_param[1] // self.water_volume_param[3])
+            return await self.jura.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
+                                                    self.water_volume_param[1] // self.water_volume_param[3])
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to reset_coffee_param")
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to reset_coffee_param")
         return False
 
-    def stop(self) -> bool:
-        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+    async def stop(self) -> bool:
+        if not (await self.test_and_reconnect()) or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot stop")
             return False
 
         try:
-            return self.jura.write_with_response(JuraCommand.BUTTON_6) == "ok:"
+            return await self.jura.write_with_response(JuraCommand.BUTTON_6) == "ok:"
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to stop")
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to stop")
         return False
 
-    def get_totals_statistics(self) -> Optional[Tuple[int, int, int, int, int, int, int]]:
-        if not self.test_and_reconnect() or self.__status__[1] != MakerStatus.CONNECTED:
+    async def get_totals_statistics(self) -> Optional[Tuple[int, int, int, int, int, int, int]]:
+        if not (await self.test_and_reconnect()) or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot get_totals_statistics")
             return None
 
         try:
-            return self.jura.get_totals_statistics()
+            return await self.jura.get_totals_statistics()
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to get_totals_statistics")
         except InvalidResponse as e:
