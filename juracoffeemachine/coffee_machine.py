@@ -43,6 +43,7 @@ class CoffeeMaker:
         self.jura: JuraProtocol = protocol
         self.type = "ty:EF532M V02.03"
         self.tl = "tl:BL_RL78 V01.31"
+        self.__status__ = None
         self.__update_status__(MakerStatus.NOT_CONNECTED)
         # FIXME check TL for first valid connection
         # response = await self.jura.write_with_response(JuraCommand.GET_TYPE)
@@ -53,6 +54,9 @@ class CoffeeMaker:
         logger.info("Coffee Maker connected.")
 
     def __update_status__(self, new_status):
+        if self.__status__ is not None and new_status != self.__status__[1]:
+            logger.info(f"Status: {new_status} -> {self.__status__[1]}."
+                        f"It was in the previous status for at least {time.time() - self.__status__[0]:.1f}s")
         self.__status__ = (time.time(), new_status)
 
     def get_last_status(self) -> Tuple[float, MakerStatus]:
@@ -93,7 +97,7 @@ class CoffeeMaker:
 
     @staticmethod
     def create_from_uart(port: str) -> CoffeeMaker:
-        return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _: None))
+        return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _: logger.warning("Received unexpected message")))
         # lambda b: b.dump(os.path.join(os.path.dirname(__file__),
         #                               str(int(time.time()))))))
 
@@ -110,7 +114,6 @@ class CoffeeMaker:
         ...
 
     async def ping(self, command: JuraCommand) -> Optional[Response]:
-        logger.debug(f"Current status is {self.__status__}")
         try:
             r = await self.jura.get_and_parse_message(command)
             self.__update_status__(MakerStatus.CONNECTED)
