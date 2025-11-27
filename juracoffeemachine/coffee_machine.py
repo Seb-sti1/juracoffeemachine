@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 import time
 from enum import IntEnum, Enum
-from typing import Optional, overload, Tuple, Callable
 from threading import Lock
+from typing import Optional, overload, Tuple, Callable
+from xmlrpc.client import DateTime
 
 from juracoffeemachine.jura import JuraProtocol, JuraCommand, HZ, CS, IC, EmptyResponse, InvalidResponse, Response
 from juracoffeemachine.serial import JuraSerial
@@ -44,6 +45,7 @@ class CoffeeMaker:
         self.type = "ty:EF532M V02.03"
         self.__status__ = None
         self.__update_status__(MakerStatus.NOT_CONNECTED)
+        # TODO move this in __test_connection__
         response = self.jura.write_with_response(JuraCommand.GET_TYPE)
         assert response == self.type, f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
         response = self.jura.write_with_response(JuraCommand.GET_LOADER)
@@ -60,38 +62,52 @@ class CoffeeMaker:
     def get_last_status(self) -> Tuple[float, MakerStatus]:
         return self.__status__
 
-    def __test_and_reconnect__(self, _tries=3) -> bool:
-        if _tries == 3:
-            logger.info(f"Testing coffee maker connection")
-        is_invalid = False
+    def __test_connection__(self) -> Tuple[bool, Optional[bool]]:
         try:
             t = self.jura.write_with_response(JuraCommand.GET_TYPE)
             if t == self.type:
                 self.__update_status__(MakerStatus.CONNECTED)
                 logger.info("Connection recovered")
-                return True
+                return True, None
             else:
                 logger.info(f"Received invalid response {t} != {self.type}")
-                is_invalid = True
+                return False, True
         except EmptyResponse:
             logger.info("Received empty response")
-            self.__update_status__(MakerStatus.OFF)
+            return False, False
         except InvalidResponse as e:
             logger.info(f"Received invalid response {e}")
-            is_invalid = True
-        finally:
-            if is_invalid:
-                self.__update_status__(MakerStatus.DESYNCHRONISED)
-                if _tries > 0:
-                    logger.info(f"Trying to reset buffers/reopened stream")
-                    if _tries == 3:
-                        self.jura.reset_streams()
-                    else:
-                        self.jura.reopen_serial()
-                    return self.__test_and_reconnect__(_tries=_tries - 1)
-                else:
-                    logger.error(f"Reached maximum number of tries")
-        return False
+            return False, True
+
+    def __recover_connection__(self, is_invalid: bool, _tries: int = 3) -> bool:
+        if _tries > 0:
+            self.__update_status__(MakerStatus.DESYNCHRONISED if is_invalid else MakerStatus.OFF)
+            if _tries == 3:
+                logger.info(f"Trying to reset buffers")
+                self.jura.reset_streams()
+            else:
+                logger.info(f"Trying to reopen serial")
+                self.jura.reopen_serial()
+            connected, is_invalid = self.__test_connection__()
+            if connected:
+                return True
+            return self.__recover_connection__(is_invalid, _tries=_tries - 1)
+        else:
+            logger.error(f"Reached maximum number of tries")
+            self.__update_status__(MakerStatus.DESYNCHRONISED if is_invalid else MakerStatus.OFF)
+            return False
+
+    def test_connection(self) -> bool:
+        self.__jura_lock__.acquire()
+        # TODO spawn thread, add result_cb
+        logger.info(f"Testing coffee maker connection")
+        connected, is_invalid = self.__test_connection__()
+        if connected:
+            self.__jura_lock__.release()
+            return True
+        r = self.__recover_connection__(is_invalid)
+        self.__jura_lock__.release()
+        return r
 
     @staticmethod
     def create_from_uart(port: str) -> CoffeeMaker:
@@ -112,16 +128,19 @@ class CoffeeMaker:
         ...
 
     def ping(self, command: JuraCommand) -> Optional[Response]:
+        self.__jura_lock__.acquire()
         try:
             r = self.jura.get_and_parse_message(command)
             self.__update_status__(MakerStatus.CONNECTED)
+            self.__jura_lock__.release()
             return r
         except EmptyResponse:
             logger.debug(f"Received empty response")
-            self.__test_and_reconnect__()
+            self.__recover_connection__(False)
         except InvalidResponse as e:
             logger.debug(f"Received invalid response: {e}")
-            self.__test_and_reconnect__()
+            self.__recover_connection__(True)
+        self.__jura_lock__.release()
         return None
         # TODO needs to decide what needs to be done when it recovers the machine from a except
 
@@ -135,10 +154,12 @@ class CoffeeMaker:
         :param progress_cb: callback with an approximation of how much water has flown
         :return: if it is possible and succeeded
         """
-        if not self.__test_and_reconnect__() or self.__status__[1] != MakerStatus.CONNECTED:
+        if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot brew_coffee")
             return False
 
+        self.__jura_lock__.acquire()
+        # TODO spawn thread, add result_cb
         try:
             coffee_bean = max(self.coffee_bean_param[0],
                               min(self.coffee_bean_param[2], coffee_bean)) // self.coffee_bean_param[3]
@@ -173,11 +194,13 @@ class CoffeeMaker:
                         logger.warning(f"last water sensor: {last_water_sensor_values}")
                     else:
                         logger.warning(f"Coffee ending could not be detected.")
+                    self.__jura_lock__.release()
                     return True
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to brew_coffee")
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to brew_coffee")
+        self.__jura_lock__.release()
         return False
 
     def reset_coffee_param(self) -> bool:
@@ -188,41 +211,54 @@ class CoffeeMaker:
 
         :return: if it is possible and succeeded
         """
-        if not self.__test_and_reconnect__() or self.__status__[1] != MakerStatus.CONNECTED:
+        if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot reset_coffee_param")
             return False
 
+        self.__jura_lock__.acquire()
+        # TODO spawn thread, add result_cb
         try:
-            return self.jura.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
-                                              self.water_volume_param[1] // self.water_volume_param[3])
+            r = self.jura.set_coffee_param(self.coffee_bean_param[1] // self.coffee_bean_param[3],
+                                           self.water_volume_param[1] // self.water_volume_param[3])
+            self.__jura_lock__.release()
+            return r
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to reset_coffee_param")
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to reset_coffee_param")
+        self.__jura_lock__.release()
         return False
 
     def stop(self) -> bool:
-        if not self.__test_and_reconnect__() or self.__status__[1] != MakerStatus.CONNECTED:
+        if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot stop")
             return False
 
+        self.__jura_lock__.acquire()
         try:
-            return self.jura.write_with_response(JuraCommand.BUTTON_6) == "ok:"
+            r = self.jura.write_with_response(JuraCommand.BUTTON_6) == "ok:"
+            self.__jura_lock__.release()
+            return r
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to stop")
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to stop")
+        self.__jura_lock__.release()
         return False
 
     def get_totals_statistics(self) -> Optional[Tuple[int, int, int, int, int, int, int]]:
-        if not self.__test_and_reconnect__() or self.__status__[1] != MakerStatus.CONNECTED:
+        if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot get_totals_statistics")
             return None
 
+        self.__jura_lock__.acquire()
         try:
-            return self.jura.get_totals_statistics()
+            r = self.jura.get_totals_statistics()
+            self.__jura_lock__.release()
+            return r
         except EmptyResponse:
             logger.fatal(f"Received empty response while trying to get_totals_statistics")
         except InvalidResponse as e:
             logger.fatal(f"Received invalid response: {e} while trying to get_totals_statistics")
+        self.__jura_lock__.release()
         return None
