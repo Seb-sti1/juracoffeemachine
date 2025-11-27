@@ -107,18 +107,6 @@ class JuraProtocol:
     def reset_streams(self):
         self.__serial__.reset_streams()
 
-    @overload
-    async def get_and_parse_message(self, command: JuraCommand.HZ, raw: Optional[str] = None) -> Optional[HZ]:
-        ...
-
-    @overload
-    async def get_and_parse_message(self, command: JuraCommand.CS, raw: Optional[str] = None) -> Optional[CS]:
-        ...
-
-    @overload
-    async def get_and_parse_message(self, command: JuraCommand.IC, raw: Optional[str] = None) -> Optional[IC]:
-        ...
-
     async def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
         raw = raw if raw is not None else await self.write_with_response(command)
         if raw is None:
