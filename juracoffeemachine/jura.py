@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import re
 import threading
@@ -107,8 +106,20 @@ class JuraProtocol:
     def reset_streams(self):
         self.__serial__.reset_streams()
 
-    async def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
-        raw = raw if raw is not None else await self.write_with_response(command)
+    @overload
+    def get_and_parse_message(self, command: JuraCommand.HZ, raw: Optional[str] = None) -> Optional[HZ]:
+        ...
+
+    @overload
+    def get_and_parse_message(self, command: JuraCommand.CS, raw: Optional[str] = None) -> Optional[CS]:
+        ...
+
+    @overload
+    def get_and_parse_message(self, command: JuraCommand.IC, raw: Optional[str] = None) -> Optional[IC]:
+        ...
+
+    def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
+        raw = raw if raw is not None else self.write_with_response(command)
         if raw is None:
             return None
 
@@ -122,34 +133,34 @@ class JuraProtocol:
             self.unexpected_msg_callback(self.__serial__.get_debug_buffer())
             return None
 
-    async def log_statistics(self):
+    def log_statistics(self):
         for a in JuraAddress:
-            logger.info(f"{a.name}: {int(await self.read_eeprom(int(a.value)), 16)}")
+            logger.info(f"{a.name}: {int(self.read_eeprom(int(a.value)), 16)}")
 
-    async def get_totals_statistics(self) -> Tuple[int, int, int, int, int, int, int]:
+    def get_totals_statistics(self) -> Tuple[int, int, int, int, int, int, int]:
         r = []
 
         for a in [JuraAddress.TOT_ESPRESSO, JuraAddress.TOT_2_ESPRESSO,
                   JuraAddress.TOT_RISTRETTO, JuraAddress.TOT_2_RISTRETTO,
                   JuraAddress.TOT_COFFEE, JuraAddress.TOT_2_COFFEE,
                   JuraAddress.TOT_SPECIAL]:
-            r.append(int(await self.read_eeprom(int(a.value)), 16))
+            r.append(int(self.read_eeprom(int(a.value)), 16))
 
         return tuple(r)
 
-    async def __get_raw_coffee_param__(self) -> Tuple[Optional[str], Optional[str]]:
-        return (await self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value)),
-                await self.read_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value)))
+    def __get_raw_coffee_param__(self) -> Tuple[Optional[str], Optional[str]]:
+        return (self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value)),
+                self.read_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value)))
 
-    async def get_coffee_param(self) -> Tuple[Optional[int], Optional[int]]:
+    def get_coffee_param(self) -> Tuple[Optional[int], Optional[int]]:
         """
         :return: (number of coffee bean as per jura's gui, water volume in mL*)
         """
-        raw = await self.__get_raw_coffee_param__()
+        raw = self.__get_raw_coffee_param__()
         return (None if raw[0] is None else int(raw[0], 16) >> 4,
                 None if raw[1] is None else int(raw[1], 16) * 5)
 
-    async def set_coffee_param(self, coffee_bean: int, water_volume: int) -> bool:
+    def set_coffee_param(self, coffee_bean: int, water_volume: int) -> bool:
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -157,7 +168,7 @@ class JuraProtocol:
         :param water_volume: the water volume
         :return: if it is possible and succeeded
         """
-        current_q, current_v = await self.__get_raw_coffee_param__()
+        current_q, current_v = self.__get_raw_coffee_param__()
         if current_q is None:
             logger.error(f"current_q is None")
             return False
@@ -172,18 +183,18 @@ class JuraProtocol:
         if current_q == new_q and current_v == new_v:
             return True
         elif current_q == new_q:
-            return await self.write_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v)
+            return self.write_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v)
         elif current_v == new_v:
-            return await self.write_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q)
+            return self.write_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q)
         else:
-            return (await self.write_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q) and
-                    await self.write_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v))
+            return (self.write_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q) and
+                    self.write_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v))
 
     @staticmethod
     def __int_to_hex_str__(value: int) -> str:
         return hex(value)[2:].rjust(4).replace(' ', '0').upper()
 
-    async def write_eeprom(self, address: int, data: int) -> bool:
+    def write_eeprom(self, address: int, data: int) -> bool:
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -198,28 +209,28 @@ class JuraProtocol:
         address_str = self.__int_to_hex_str__(address)
         data_str = self.__int_to_hex_str__(data)
         cmd = f"{JuraCommand.WE}{address_str},{data_str}"
-        r = await self.write_with_response(cmd)
+        r = self.write_with_response(cmd)
         return r == "ok:"
 
-    async def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[str]:
+    def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[str]:
         address_str = self.__int_to_hex_str__(address)
         cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address_str}"
-        r = await self.write_with_response(cmd)
+        r = self.write_with_response(cmd)
         return None if r is None else r.split(":")[-1]
 
-    async def dump_eeprom(self) -> str:
+    def dump_eeprom(self) -> str:
         mem = ""
         address = 0
         while address < 0x400:
-            r = await self.read_eeprom(address, True)  # TODO handle errors
+            r = self.read_eeprom(address, True)  # TODO handle errors
             logger.debug(f"{hex(address).ljust(6)} -> {r}")
             mem += r
             address += 16
         return mem
 
-    async def dump_eeprom_to_file(self, path: Path):
+    def dump_eeprom_to_file(self, path: Path):
         with open(path, "wb") as f:
-            eeprom = await self.dump_eeprom()
+            eeprom = self.dump_eeprom()
             data = int(eeprom, 16)
             f.write(data.to_bytes(len(eeprom) // 2))
 
@@ -275,20 +286,20 @@ class JuraProtocol:
 
         return dec_data
 
-    async def write(self, data: str, end_separator: str = "\r\n") -> bool:
+    def write(self, data: str, end_separator: str = "\r\n") -> bool:
         self.actionLock.acquire()
         try:
             for c in data + end_separator:
                 written = self.__serial__.write(bytes(self.encode(ord(c))))
                 self.__serial__.flush()
-                await asyncio.sleep(0.008)
+                time.sleep(0.008)
                 if written != 4:
                     return False
             return True
         finally:
             self.actionLock.release()
 
-    async def read(self, end_separator: str = "\r\n", timeout: float = 3, wait: float = 0.5) -> str:
+    def read(self, end_separator: str = "\r\n", timeout: float = 3, wait: float = 0.5) -> str:
         self.actionLock.acquire()
         result = []
         buffer = []
@@ -304,7 +315,7 @@ class JuraProtocol:
                 result.append(chr(decoded))
                 buffer = []
             else:
-                await asyncio.sleep(wait)
+                time.sleep(wait)
         self.actionLock.release()
         if empty:
             raise EmptyResponse()
@@ -313,7 +324,7 @@ class JuraProtocol:
             raise InvalidResponse(r)
         return r
 
-    async def write_with_response(self, data: str, timeout: float = 3) -> Optional[str]:
-        if await self.write(data):
-            return await self.read(timeout=timeout)
+    def write_with_response(self, data: str, timeout: float = 3) -> Optional[str]:
+        if self.write(data):
+            return self.read(timeout=timeout)
         return None
