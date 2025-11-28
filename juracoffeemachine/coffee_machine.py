@@ -44,20 +44,34 @@ class CoffeeMaker:
         self.jura: JuraProtocol = protocol
         self.type = "ty:EF532M V02.03"
         self.__status__ = None
+        self.__jura_lock__ = Lock()
         self.__update_status__(MakerStatus.NOT_CONNECTED)
-        # TODO move this in __test_connection__
-        response = self.jura.write_with_response(JuraCommand.GET_TYPE)
-        assert response == self.type, f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
-        response = self.jura.write_with_response(JuraCommand.GET_LOADER)
-        assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
-        self.__update_status__(MakerStatus.CONNECTED)
-        logger.info("Coffee Maker connected.")
 
     def __update_status__(self, new_status):
         if self.__status__ is not None and new_status != self.__status__[1]:
             logger.info(f"Status: {self.__status__[1]} -> {new_status}."
                         f"It was in the previous status for at least {time.time() - self.__status__[0]:.1f}s")
         self.__status__ = (time.time(), new_status)
+
+    def check_maker_version(self) -> bool:
+        if self.__status__[1] == MakerStatus.NOT_CONNECTED:
+            self.__jura_lock__.acquire()
+            try:
+                response = self.jura.write_with_response(JuraCommand.GET_TYPE)
+                assert response == self.type, f"This code was created for 'ty:EF532M V02.03' machine not '{response}'"
+                response = self.jura.write_with_response(JuraCommand.GET_LOADER)
+                assert response == "tl:BL_RL78 V01.31", f"This code was created for 'tl:BL_RL78 V01.31' machine not '{response}'"
+                self.__update_status__(MakerStatus.CONNECTED)
+                logger.info("Coffee Maker connected.")
+                self.__jura_lock__.release()
+                return True
+            except EmptyResponse:
+                logger.info("Received empty response")
+            except InvalidResponse as e:
+                logger.info(f"Received invalid response {e}")
+            self.__jura_lock__.release()
+            return False
+        return True
 
     def get_last_status(self) -> Tuple[float, MakerStatus]:
         return self.__status__
@@ -98,6 +112,9 @@ class CoffeeMaker:
             return False
 
     def test_connection(self) -> bool:
+        if not self.check_maker_version():
+            return False
+
         self.__jura_lock__.acquire()
         # TODO spawn thread, add result_cb
         logger.info(f"Testing coffee maker connection")
@@ -128,6 +145,9 @@ class CoffeeMaker:
         ...
 
     def ping(self, command: JuraCommand) -> Optional[Response]:
+        if not self.check_maker_version():
+            return None
+
         self.__jura_lock__.acquire()
         try:
             r = self.jura.get_and_parse_message(command)
@@ -154,6 +174,9 @@ class CoffeeMaker:
         :param progress_cb: callback with an approximation of how much water has flown
         :return: if it is possible and succeeded
         """
+        if not self.check_maker_version():
+            return False
+
         if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot brew_coffee")
             return False
@@ -211,6 +234,9 @@ class CoffeeMaker:
 
         :return: if it is possible and succeeded
         """
+        if not self.check_maker_version():
+            return False
+
         if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot reset_coffee_param")
             return False
@@ -230,6 +256,9 @@ class CoffeeMaker:
         return False
 
     def stop(self) -> bool:
+        if not self.check_maker_version():
+            return False
+
         if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot stop")
             return False
@@ -247,6 +276,9 @@ class CoffeeMaker:
         return False
 
     def get_totals_statistics(self) -> Optional[Tuple[int, int, int, int, int, int, int]]:
+        if not self.check_maker_version():
+            return None
+
         if not self.test_connection() or self.__status__[1] != MakerStatus.CONNECTED:
             logger.fatal(f"Machine is not connected ({self.__status__}), cannot get_totals_statistics")
             return None
