@@ -32,6 +32,9 @@ def main():
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     machin = CoffeeMaker.create_from_uart(args.port)
+    if args.action == "ty":
+        msg = machin.jura.write_with_response(JuraCommand.GET_TYPE)
+        logger.info(f"{msg}")
     if args.action == "hz":
         msg = machin.jura.get_and_parse_message(JuraCommand.HZ)
         logger.info(f"{msg.raw}: {msg}")
@@ -52,7 +55,7 @@ def main():
             msg = machin.jura.get_and_parse_message(JuraCommand.CS)
             logger.info(f"{msg.raw}: {msg}")
     elif args.action == "brew_coffee":
-        machin.brew_coffee(2, 100)
+        machin.brew_coffee(2, 100, lambda v: logger.info(f"Volume is {v}"))
     elif args.action == "stop":
         logger.info("Button acknowledge" if machin.stop() else "Sent but not acknowledge")
     elif args.action == "eeprom":
