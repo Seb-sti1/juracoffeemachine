@@ -2,3 +2,5 @@
 omit =
       test_*
       juracoffeemachine/serial.py
+      juracoffeemachine/__main__.py
+      juracoffeemachine/__init__.py

@@ -4,7 +4,7 @@ from juracoffeemachine import JuraProtocol, JuraCommand, CS, HZ, IC
 from test_jura import ValidSerial
 
 
-def encode_str(data) -> list[int]:
+def encode_str(data: str) -> list[int]:
     encoded = []
     for c in data + "\r\n":
         encoded += JuraProtocol.encode(ord(c))  # tested in test_jura.py

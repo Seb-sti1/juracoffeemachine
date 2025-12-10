@@ -3,6 +3,13 @@ import pytest
 from juracoffeemachine import CircularBuffer, AbstractSerial, JuraProtocol, JuraCommand
 
 
+def decode(data: list[int]) -> str:
+    decoded = []
+    for i in range(0, len(data), 4):
+        decoded += chr(JuraProtocol.decode(data[i: i + 4]))
+    return ''.join(decoded)
+
+
 class ValidSerial(AbstractSerial):
     def __init__(self):
         super().__init__()
@@ -19,11 +26,13 @@ class ValidSerial(AbstractSerial):
     def read(self, size=4) -> bytes:
         r = self.read_buffer[self.read_index:self.read_index + size]
         self.read_index += size
+        # print(f"read: {decode(r)}")
         return bytes(r)
 
     def write(self, data: bytes) -> int:
         written = list(data)
         self.write_buffer += list(written)
+        # print(f"wrote: {decode(written)}")
         return len(written)
 
     def flush(self):
