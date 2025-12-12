@@ -289,13 +289,9 @@ class JuraProtocol:
     def write(self, data: str, end_separator: str = "\r\n") -> bool:
         self.actionLock.acquire()
         try:
-            for c in data + end_separator:
-                written = self.__serial__.write(bytes(self.encode(ord(c))))
-                self.__serial__.flush()
-                time.sleep(0.008)
-                if written != 4:
-                    return False
-            return True
+            encoded_data = bytes([d for c in data + end_separator for d in self.encode(ord(c))])
+            written = self.__serial__.write(encoded_data)
+            return written == len(encoded_data)
         finally:
             self.actionLock.release()
 
