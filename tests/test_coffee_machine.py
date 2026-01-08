@@ -53,7 +53,6 @@ def test_brew_coffee():
     while not result[0]:
         time.sleep(1)
 
-    assert m.get_last_status().water_volume > 100
     assert t.read_index == len(t.read_buffer)
     assert t.write_buffer == write_buffer
 
@@ -138,7 +137,6 @@ def test_brew_then_reset():
     while not result[0]:
         time.sleep(1)
 
-    assert m.get_last_status().water_volume > 100
     assert t.read_index == len(t.read_buffer)
     assert t.write_buffer == write_buffer
 

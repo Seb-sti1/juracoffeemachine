@@ -281,6 +281,7 @@ class CoffeeMaker:
                             logger.warning(f"Coffee ending could not be detected.")
                         self.__update_maker_status__(MakerStatus.IDLE)
                         cb(True)
+                        self.__update_brewing__(0)
                         self.__jura_lock__.release()
                         return
             except EmptyResponse:
