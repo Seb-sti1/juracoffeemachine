@@ -75,8 +75,9 @@ class CoffeeMaker:
         if new_status != self.get_last_status().maker_status:
             dt = str(datetime.now() - self.get_last_status().last_maker_status_change).split('.')[0]
             logger.info(f"Status: {self.get_last_status().maker_status} -> {new_status}."
-                        f"It was in the previous status for {dt}")
+                        f" It was in the previous status for {dt}")
             self.__status__.maker_status = new_status
+            self.__status__.last_maker_status_change = datetime.now()
 
     def __update_brewing__(self, water_volume: float):
         self.__status__.water_volume = water_volume
@@ -235,7 +236,7 @@ class CoffeeMaker:
                 return
 
             if not self.__test_connection__()[0] or self.get_last_status().maker_status != MakerStatus.IDLE:
-                logger.fatal(f"Machine is not connected ({self.__status__}), cannot brew_coffee")
+                logger.fatal(f"Machine is not connected ({self.__status__.maker_status}), cannot brew_coffee")
                 cb(False)
                 self.__jura_lock__.release()
                 return
@@ -284,6 +285,10 @@ class CoffeeMaker:
                         self.__update_brewing__(0)
                         self.__jura_lock__.release()
                         return
+                    else:
+                        logger.warning("Could not press button.")
+                else:
+                    logger.warning("Could not send coffee params.")
             except EmptyResponse:
                 logger.fatal(f"Received empty response while trying to brew_coffee")
             except InvalidResponse as e:
