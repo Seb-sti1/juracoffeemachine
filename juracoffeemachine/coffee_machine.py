@@ -251,7 +251,7 @@ class CoffeeMaker:
                     self.__update_last_contact__()
                     if self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) == "ok:":
                         self.__update_last_contact__()
-                        logger.info(f"Brewing {coffee_bean} beans {water_volume} * 5 mL")
+                        logger.info(f"Brewing {_coffee_bean} beans {_water_volume} * 5 mL")
                         start_time = time.time()
                         end_detected = False
                         last_water_sensor_values = [0, 0, 0]
