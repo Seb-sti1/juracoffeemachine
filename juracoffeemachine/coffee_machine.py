@@ -247,7 +247,7 @@ class CoffeeMaker:
                                    min(self.coffee_bean_param[2], coffee_bean)) // self.coffee_bean_param[3]
                 _water_volume = max(self.water_volume_param[0],
                                     min(self.water_volume_param[2], water_volume)) // self.water_volume_param[3]
-                if self.jura.set_coffee_param(coffee_bean, water_volume):
+                if self.jura.set_coffee_param(_coffee_bean, _water_volume):
                     self.__update_last_contact__()
                     if self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) == "ok:":
                         self.__update_last_contact__()

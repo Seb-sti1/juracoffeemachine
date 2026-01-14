@@ -45,9 +45,8 @@ def test_brew_coffee():
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
     m = CoffeeMaker(p)
-    m.brew_coffee((CoffeeMaker.coffee_bean_param[1] - 2) // CoffeeMaker.coffee_bean_param[3],
-                  (CoffeeMaker.water_volume_param[1] - CoffeeMaker.water_volume_param[3] * 2) //
-                  CoffeeMaker.water_volume_param[3],
+    m.brew_coffee((CoffeeMaker.coffee_bean_param[1] - 2),
+                  (CoffeeMaker.water_volume_param[1] - CoffeeMaker.water_volume_param[3] * 2),
                   _cb)
 
     while not result[0]:
@@ -128,9 +127,8 @@ def test_brew_then_reset():
 
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
     m = CoffeeMaker(p)
-    m.brew_coffee((CoffeeMaker.coffee_bean_param[1] - 2) // CoffeeMaker.coffee_bean_param[3],
-                  (CoffeeMaker.water_volume_param[1] - CoffeeMaker.water_volume_param[3] * 2) //
-                  CoffeeMaker.water_volume_param[3],
+    m.brew_coffee((CoffeeMaker.coffee_bean_param[1] - 2),
+                  (CoffeeMaker.water_volume_param[1] - CoffeeMaker.water_volume_param[3] * 2),
                   _cb)
     m.reset_coffee_param(_cb)
 
