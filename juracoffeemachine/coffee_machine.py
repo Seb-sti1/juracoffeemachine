@@ -256,7 +256,7 @@ class CoffeeMaker:
                         end_detected = False
                         last_water_sensor_values = [0, 0, 0]
 
-                        while (time.time() - start_time) < 10 and not end_detected:
+                        while (time.time() - start_time) < 90 and not end_detected:
                             cs = None
                             try:
                                 cs = self.jura.get_and_parse_message(JuraCommand.CS)
