@@ -254,6 +254,7 @@ class CoffeeMaker:
                         logger.info(f"Brewing {_coffee_bean} beans {_water_volume} * 5 mL")
                         start_time = time.time()
                         end_detected = False
+                        initial_water_sensor_value = None
                         last_water_sensor_values = [0, 0, 0]
 
                         while (time.time() - start_time) < 90 and not end_detected:
@@ -270,8 +271,11 @@ class CoffeeMaker:
                                 logger.warning(f"Received cs == None")
                             else:
                                 last_water_sensor_values.append(cs.water_vol)
+                                if (time.time() - start_time) < 5 and initial_water_sensor_value is None:
+                                    initial_water_sensor_value = cs.water_vol
                                 last_water_sensor_values = last_water_sensor_values[1:4]
                                 end_detected = last_water_sensor_values[0] != 0 and \
+                                               last_water_sensor_values[0] != initial_water_sensor_value and \
                                                all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
                                 self.__update_brewing__(
                                     int(last_water_sensor_values[-1] / self.water_sensor_to_water_value))
