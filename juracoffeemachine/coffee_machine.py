@@ -89,10 +89,14 @@ class CoffeeMaker:
         if self.__status__.maker_status == MakerStatus.NOT_CONNECTED:
             try:
                 response = self.jura.write_with_response(JuraCommand.GET_TYPE)
-                assert response == self.type, f"This code was created for '{self.type}' machine not '{response}'"
+                if response != self.type:
+                    logger.error(f"This code was created for '{self.type}' machine not '{response}'")
+                    return False
                 self.__update_last_contact__()
                 response = self.jura.write_with_response(JuraCommand.GET_LOADER)
-                assert response == self.bootloader, f"This code was created for '{self.bootloader}' machine not '{response}'"
+                if response != self.bootloader:
+                    logger.error(f"This code was created for '{self.bootloader}' machine not '{response}'")
+                    return False
                 self.__update_last_contact__()
                 self.__update_maker_status__(MakerStatus.IDLE, True)
                 logger.info("Coffee Maker connected.")
