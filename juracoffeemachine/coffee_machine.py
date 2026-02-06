@@ -174,15 +174,15 @@ class CoffeeMaker:
         #                               str(int(time.time()))))))
 
     @overload
-    def ping(self, command: JuraCommand.HZ, cb: Callable[[Optional[Response]], None]) -> Optional[HZ]:
+    def ping(self, command: JuraCommand.HZ, cb: Callable[[Optional[HZ]], None]) -> Optional[HZ]:
         ...
 
     @overload
-    def ping(self, command: JuraCommand.CS, cb: Callable[[Optional[Response]], None]) -> Optional[CS]:
+    def ping(self, command: JuraCommand.CS, cb: Callable[[Optional[CS]], None]) -> Optional[CS]:
         ...
 
     @overload
-    def ping(self, command: JuraCommand.IC, cb: Callable[[Optional[Response]], None]) -> Optional[IC]:
+    def ping(self, command: JuraCommand.IC, cb: Callable[[Optional[IC]], None]) -> Optional[IC]:
         ...
 
     def ping(self, command: JuraCommand, cb: Callable[[Optional[Response]], None]):
