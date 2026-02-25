@@ -137,15 +137,16 @@ class JuraProtocol:
         for a in JuraAddress:
             logger.info(f"{a.name}: {int(self.read_eeprom(int(a.value)), 16)}")
 
-    def get_totals_statistics(self) -> Tuple[int, int, int, int, int, int, int]:
+    def get_totals_statistics(self) -> Tuple[Optional[int], Optional[int], Optional[int],
+    Optional[int], Optional[int], Optional[int], Optional[int]]:
         r = []
 
         for a in [JuraAddress.TOT_ESPRESSO, JuraAddress.TOT_2_ESPRESSO,
                   JuraAddress.TOT_RISTRETTO, JuraAddress.TOT_2_RISTRETTO,
                   JuraAddress.TOT_COFFEE, JuraAddress.TOT_2_COFFEE,
                   JuraAddress.TOT_SPECIAL]:
-            r.append(int(self.read_eeprom(int(a.value)), 16))
-
+            read = self.read_eeprom(int(a.value))
+            r.append(int(read, 16) if read is not None else None)
         return tuple(r)
 
     def __get_raw_coffee_param__(self) -> Tuple[Optional[str], Optional[str]]:

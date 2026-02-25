@@ -384,7 +384,8 @@ class CoffeeMaker:
         self.__brew_thread__ = Thread(target=__exec__)
         self.__brew_thread__.start()
 
-    def get_totals_statistics(self, cb: Callable[[Optional[Tuple[int, int, int, int, int, int, int]]], None]):
+    def get_totals_statistics(self, cb: Callable[[Optional[Tuple[Optional[int], Optional[int], Optional[int],
+    Optional[int], Optional[int], Optional[int], Optional[int]]]], None]):
         self.__jura_lock__.acquire()
         if self.__brew_thread__ is not None:
             self.__brew_thread__.join()
