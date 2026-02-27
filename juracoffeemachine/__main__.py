@@ -57,7 +57,7 @@ def main():
     elif args.action == "brew_coffee":
         machin.brew_coffee(2, 100, lambda v: logger.info(f"Volume is {v}"))
     elif args.action == "stop":
-        logger.info("Button acknowledge" if machin.stop() else "Sent but not acknowledge")
+        logger.info("Button acknowledge" if machin.stop(lambda _: None) else "Sent but not acknowledge")
     elif args.action == "eeprom":
         machin.jura.dump_eeprom_to_file(Path(f"./eeprom{int(time.time())}.dump"))
     machin.jura.__serial__.close()
