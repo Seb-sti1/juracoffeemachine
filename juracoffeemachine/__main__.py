@@ -28,7 +28,8 @@ def main():
     rotating_handler.setFormatter(fmt)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(fmt)
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, handlers=[rotating_handler, console_handler])
+    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
+                        handlers=[rotating_handler, console_handler])
     logging.getLogger().setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     machin = CoffeeMaker.create_from_uart(args.port)
