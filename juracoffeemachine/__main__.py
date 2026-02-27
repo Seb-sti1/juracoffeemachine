@@ -41,6 +41,9 @@ def main():
     elif args.action == "cs":
         msg = machin.jura.get_and_parse_message(JuraCommand.CS)
         logger.info(f"{msg.raw}: {msg}")
+    elif args.action == "ic":
+        msg = machin.jura.get_and_parse_message(JuraCommand.IC)
+        logger.info(f"{msg.raw}: {msg}")
     elif args.action == "stat":
         machin.jura.log_statistics()
     elif args.action == "coffee_param":
