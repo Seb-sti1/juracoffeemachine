@@ -97,11 +97,11 @@ def test_write_with_response():
 def test_read_eeprom():
     t = ValidSerial()
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
-    t.read_buffer = [95, 95, 123, 95, 123, 123, 127, 91, 95, 95, 91, 95, 95, 91, 91, 95, 95, 95, 91, 95, 95, 91, 91, 95,
-                     95, 127, 91, 91, 123, 123, 91, 91]
+    t.read_buffer = [123, 91, 127, 95, 95, 95, 123, 95, 123, 123, 127, 91, 95, 95, 91, 95, 95, 91, 91, 95, 95, 95, 91,
+                     95, 95, 91, 91, 95, 95, 127, 91, 91, 123, 123, 91, 91]
 
     resp = p.read_eeprom(0x2a3)
 
     assert t.write_buffer == [123, 91, 95, 95, 95, 95, 91, 95, 123, 123, 127, 91, 91, 91, 127, 91, 123, 91, 127, 91, 95,
                               91, 91, 95, 127, 91, 127, 91, 95, 127, 91, 91, 123, 123, 91, 91]
-    assert resp == "EAEA"
+    assert resp == int("EAEA", 16)

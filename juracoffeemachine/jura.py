@@ -215,9 +215,10 @@ class JuraProtocol:
 
     def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[str]:
         address_str = self.__int_to_hex_str__(address)
-        cmd = f"{JuraCommand.RT if use_rt else JuraCommand.RE}{address_str}"
+        prefix = JuraCommand.RT if use_rt else JuraCommand.RE
+        cmd = f"{prefix}{address_str}"
         r = self.write_with_response(cmd)
-        return None if r is None else r.split(":")[-1]
+        return None if r is None or not r.startswith(prefix.lower()) else r.split(":")[-1]
 
     def dump_eeprom(self) -> str:
         mem = ""
