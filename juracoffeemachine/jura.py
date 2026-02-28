@@ -135,7 +135,7 @@ class JuraProtocol:
 
     def log_statistics(self):
         for a in JuraAddress:
-            logger.info(f"{a.name}: {int(self.read_eeprom(int(a.value)), 16)}")
+            logger.info(f"{a.name}: {self.read_eeprom(int(a.value))}")
 
     def get_totals_statistics(self) -> Tuple[Optional[int], Optional[int], Optional[int],
     Optional[int], Optional[int], Optional[int], Optional[int]]:
@@ -146,10 +146,10 @@ class JuraProtocol:
                   JuraAddress.TOT_COFFEE, JuraAddress.TOT_2_COFFEE,
                   JuraAddress.TOT_SPECIAL]:
             read = self.read_eeprom(int(a.value))
-            r.append(int(read, 16) if read is not None else None)
+            r.append(None if read is None else read)
         return tuple(r)
 
-    def __get_raw_coffee_param__(self) -> Tuple[Optional[str], Optional[str]]:
+    def __get_raw_coffee_param__(self) -> Tuple[Optional[int], Optional[int]]:
         return (self.read_eeprom(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value)),
                 self.read_eeprom(int(JuraAddress.PARAM_COFFEE_WATER_V.value)))
 
@@ -158,8 +158,8 @@ class JuraProtocol:
         :return: (number of coffee bean as per jura's gui, water volume in mL*)
         """
         raw = self.__get_raw_coffee_param__()
-        return (None if raw[0] is None else int(raw[0], 16) >> 4,
-                None if raw[1] is None else int(raw[1], 16) * 5)
+        return (None if raw[0] is None else raw[0] >> 4,
+                None if raw[1] is None else raw[1] * 5)
 
     def set_coffee_param(self, coffee_bean: int, water_volume: int) -> bool:
         """
@@ -173,8 +173,8 @@ class JuraProtocol:
         if current_q is None:
             logger.error(f"current_q is None")
             return False
-        current_q = int(current_q, 16)
-        current_v = int(current_v, 16)
+        current_q = current_q
+        current_v = current_v
         if coffee_bean < 0 or coffee_bean > 7:
             return False
         if water_volume < 5 or water_volume > 0x30:
@@ -213,28 +213,36 @@ class JuraProtocol:
         r = self.write_with_response(cmd)
         return r == "ok:"
 
-    def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[str]:
+    def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[int]:
         address_str = self.__int_to_hex_str__(address)
         prefix = JuraCommand.RT if use_rt else JuraCommand.RE
         cmd = f"{prefix}{address_str}"
         r = self.write_with_response(cmd)
-        return None if r is None or not r.startswith(prefix.lower()) else r.split(":")[-1]
+        if r is None or not r.startswith(prefix.lower()):
+            return None
+        try:
+            return int(r.replace(prefix.lower(), ''), 16)
+        except ValueError:
+            return None
 
-    def dump_eeprom(self) -> str:
-        mem = ""
-        address = 0
-        while address < 0x400:
-            r = self.read_eeprom(address, True)  # TODO handle errors
-            logger.debug(f"{hex(address).ljust(6)} -> {r}")
-            mem += r
-            address += 16
+    def dump_eeprom(self) -> int:
+        mem = 0
+        for address in range(0, 0x400, 16):
+            r = None
+            for _ in range(3):
+                r = self.read_eeprom(address, True)
+                if r is not None:
+                    break
+            logger.info(f"{hex(address).ljust(6)}: {hex(r) if r is not None else r}")
+            if r is None:
+                r = 0
+            mem |= r << (address * 16)
         return mem
 
     def dump_eeprom_to_file(self, path: Path):
         with open(path, "wb") as f:
             eeprom = self.dump_eeprom()
-            data = int(eeprom, 16)
-            f.write(data.to_bytes(len(eeprom) // 2))
+            f.write(eeprom.to_bytes(0x800))
 
     @staticmethod
     def encode(dec_data: int) -> List[int]:

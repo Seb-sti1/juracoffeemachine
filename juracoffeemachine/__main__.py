@@ -91,7 +91,10 @@ def main():
 
         def _run():
             msg = machin.jura.read_eeprom(addr)
-            logger.info(f"{msg} = {int(msg, 16)}")
+            if msg is None:
+                logger.info(f"None")
+            else:
+                logger.info(f"{hex(msg)} = {msg}")
 
         spin(_run)
     elif args.action == "brew_coffee":
