@@ -4,7 +4,7 @@ import threading
 import time
 from enum import StrEnum, Enum
 from pathlib import Path
-from typing import List, Optional, Callable, overload, Tuple
+from typing import List, Optional, Callable, overload, Tuple, Literal
 
 from juracoffeemachine.response import HZ, CS, IC, Response
 from juracoffeemachine.serial import CircularBuffer, AbstractSerial
@@ -107,15 +107,15 @@ class JuraProtocol:
         self.__serial__.reset_streams()
 
     @overload
-    def get_and_parse_message(self, command: JuraCommand.HZ, raw: Optional[str] = None) -> Optional[HZ]:
+    def get_and_parse_message(self, command: Literal[JuraCommand.HZ], raw: Optional[str] = None) -> Optional[HZ]:
         ...
 
     @overload
-    def get_and_parse_message(self, command: JuraCommand.CS, raw: Optional[str] = None) -> Optional[CS]:
+    def get_and_parse_message(self, command: Literal[JuraCommand.CS], raw: Optional[str] = None) -> Optional[CS]:
         ...
 
     @overload
-    def get_and_parse_message(self, command: JuraCommand.IC, raw: Optional[str] = None) -> Optional[IC]:
+    def get_and_parse_message(self, command: Literal[JuraCommand.IC], raw: Optional[str] = None) -> Optional[IC]:
         ...
 
     def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
