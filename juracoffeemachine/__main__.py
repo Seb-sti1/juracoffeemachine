@@ -1,9 +1,11 @@
 import argparse
 import logging
 import sys
+import threading
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import Callable
 
 from juracoffeemachine import JuraCommand
 from juracoffeemachine.coffee_machine import CoffeeMaker
@@ -11,15 +13,34 @@ from juracoffeemachine.coffee_machine import CoffeeMaker
 logger = logging.getLogger(__name__)
 
 
+def spin(func: Callable[[], None]):
+    is_running = True
+
+    def _exec():
+        while is_running:
+            try:
+                func()
+            except Exception as e:
+                logger.warning(f"{type(e)}")
+
+    t = threading.Thread(target=_exec)
+    t.start()
+    input("Press any 'enter' to stop.")
+    is_running = False
+    t.join()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('port', default='/dev/ttyUSB0', help='Serial port (default: /dev/ttyUSB0)')
     parser.add_argument('action', choices=["ty", "hz", "cs", "stat",
-                                           "while_hz", "while_cs",
+                                           "while_hz", "while_cs", "while_read",
                                            "brew_coffee",
                                            "stop",
                                            "eeprom"],
                         help='The action to perform.')
+    parser.add_argument('address', nargs='?', default="0x0000",
+                        help="An address (in [0x0, 0x400[) to read.")
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable debug output.')
     args = parser.parse_args()
 
@@ -51,13 +72,28 @@ def main():
         q, v = machin.jura.get_coffee_param()
         logger.info(f"{q} beans and {v} mL")
     elif args.action == "while_hz":
-        while True:
+        def _run():
             msg = machin.jura.get_and_parse_message(JuraCommand.HZ)
             logger.info(f"{msg.raw}: {msg}")
+
+        spin(_run)
     elif args.action == "while_cs":
-        while True:
+        def _run():
             msg = machin.jura.get_and_parse_message(JuraCommand.CS)
             logger.info(f"{msg.raw}: {msg}")
+
+        spin(_run)
+    elif args.action == "while_read":
+        addr = int(args.address, 16)
+        if addr < 0 or addr >= 0x400:
+            logger.fatal("Address is outside authorised range [0x0, 0x400[.")
+            exit(-1)
+
+        def _run():
+            msg = machin.jura.read_eeprom(addr)
+            logger.info(f"{msg} = {int(msg, 16)}")
+
+        spin(_run)
     elif args.action == "brew_coffee":
         machin.brew_coffee(2, 100, lambda v: logger.info(f"Volume is {v}"))
     elif args.action == "stop":
