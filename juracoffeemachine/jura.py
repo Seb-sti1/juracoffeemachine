@@ -35,6 +35,9 @@ class JuraAddress(Enum):
     TOT_SPECIAL = 0x208
     TOT_HOT_WATER = 0x014
 
+    # quantity of coffee grounds in the tank, will ask to empty it once value is above or equal to 1100 (x044C)
+    COFFEE_GROUNDS_TANK = 0x119
+
     # note that daily is not really daily, it is a value that the user can reset manually
     DAILY_ESPRESSO = 0x180
     # DAILY_2_ESPRESSO = ?
