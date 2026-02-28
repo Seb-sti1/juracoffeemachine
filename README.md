@@ -4,7 +4,7 @@ It is _(will be)_ used in app that tracks how many coffees each employee takes.
 Therefore, it aims for high reliability and low maintenance.
 
 > [!NOTE]
-> This code was tested on a Jura responding `ty:EF532M V02.03` `TY:` and `tl:BL_RL78 V01.31` to `TL:`.
+> This code was tested on a Jura responding `ty:EF532M V02.03` to `TY:` and `tl:BL_RL78 V01.31` to `TL:`.
 
 ## Installation
 
