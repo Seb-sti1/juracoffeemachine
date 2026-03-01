@@ -98,6 +98,11 @@ class JuraProtocol:
         JuraCommand.IC: IC,
     }
 
+    # min, initial, max, step
+    coffee_param = (1, 4, 8, 1)
+    water_param = (25, 100, 240, 5)
+    water_sensor_to_water_value = 2.18595512820513
+
     def __init__(self, s: AbstractSerial, unexpected_msg_callback: Callable[[CircularBuffer], None]):
         self.__serial__ = s
         self.actionLock = threading.Lock()
@@ -161,29 +166,27 @@ class JuraProtocol:
         :return: (number of coffee bean as per jura's gui, water volume in mL*)
         """
         raw = self.__get_raw_coffee_param__()
-        return (None if raw[0] is None else raw[0] >> 4,
+        return (None if raw[0] is None else raw[0] >> 4 + 1,
                 None if raw[1] is None else raw[1] * 5)
 
     def set_coffee_param(self, coffee_bean: int, water_volume: int) -> bool:
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
-        :param coffee_bean: the quantity of coffee
-        :param water_volume: the water volume
+        :param coffee_bean: the quantity of coffee (number of beans as per jura's gui)
+        :param water_volume: the water volume in mL
         :return: if it is possible and succeeded
         """
+        if coffee_bean < self.coffee_param[0] or coffee_bean > self.coffee_param[2]:
+            return False
+        if water_volume < self.water_param[0] or water_volume > self.water_param[2]:
+            return False
         current_q, current_v = self.__get_raw_coffee_param__()
         if current_q is None:
             logger.error(f"current_q is None")
             return False
-        current_q = current_q
-        current_v = current_v
-        if coffee_bean < 0 or coffee_bean > 7:
-            return False
-        if water_volume < 5 or water_volume > 0x30:
-            return False
-        new_q = (current_q & 0b1111111100001111) | (coffee_bean << 4)
-        new_v = water_volume
+        new_q = (current_q & 0b1111111100001111) | (((coffee_bean // self.coffee_param[3]) - 1) << 4)
+        new_v = (water_volume // self.water_param[3]) & 0b0000000011111111
         if current_q == new_q and current_v == new_v:
             return True
         elif current_q == new_q:

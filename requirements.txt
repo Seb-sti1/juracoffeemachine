@@ -1,4 +1,5 @@
 pyserial
 pytest
+pytest-mock
 coverage
 build

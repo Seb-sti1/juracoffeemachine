@@ -1,6 +1,6 @@
 import pytest
 
-from juracoffeemachine import CircularBuffer, AbstractSerial, JuraProtocol, JuraCommand
+from juracoffeemachine import CircularBuffer, AbstractSerial, JuraProtocol, JuraCommand, JuraAddress
 
 
 def decode(data: list[int]) -> str:
@@ -81,6 +81,39 @@ def test_read():
     p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
 
     assert p.read() == "ty:EF532M V02.03"
+
+
+@pytest.mark.parametrize(
+    ("coffee_bean", "water_volume", "current_q", "current_v", "returned", "new_q", "new_v"),
+    [
+        (0, 50, 0x0031, 0x0014, False, None, None),
+        (4, 0, 0x0031, 0x0014, False, None, None),
+        (4, 100, 0x0031, 0x0014, True, None, None),
+        (3, 100, 0x0031, 0x0014, True, 0x0021, None),
+        (4, 110, 0x0031, 0x0014, True, None, 0x0016),
+        (3, 110, 0x0031, 0x0014, True, 0x0021, 0x0016),
+    ],
+)
+def test_set_coffee_param(mocker, coffee_bean, water_volume, current_q, current_v, returned, new_q, new_v):
+    t = ValidSerial()
+    p = JuraProtocol(t, unexpected_msg_callback=lambda c: None)
+
+    mocker.patch.object(p, "__get_raw_coffee_param__", return_value=(current_q, current_v))
+    mock_write = mocker.patch.object(p, "write_eeprom", return_value=True)
+
+    result = p.set_coffee_param(coffee_bean, water_volume)
+
+    assert result == returned
+    if new_q is not None:
+        mock_write.assert_any_call(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q)
+    else:
+        assert not any(call == call(int(JuraAddress.PARAM_COFFEE_BEAN_Q.value), new_q)
+                       for call in mock_write.call_args_list)
+    if new_v is not None:
+        mock_write.assert_any_call(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v)
+    else:
+        assert not any(call == call(int(JuraAddress.PARAM_COFFEE_WATER_V.value), new_v)
+                       for call in mock_write.call_args_list)
 
 
 def test_write_with_response():
