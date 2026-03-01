@@ -1,144 +1,229 @@
-import time
+from threading import Event
+from typing import Optional, Tuple
 
-from juracoffeemachine import JuraProtocol, CoffeeMaker, JuraCommand
-from tests.test_jura import ValidSerial
-from tests.test_response import encode_str
+import pytest
 
-
-def init_seq_coffee_brew(t: ValidSerial) -> list[int]:
-    write_buffer = encode_str("TY:")
-    t.read_buffer = encode_str("ty:EF532M V02.03")
-    write_buffer += encode_str("TL:")
-    t.read_buffer += encode_str("tl:BL_RL78 V01.31")
-    write_buffer += encode_str("TY:")
-    t.read_buffer += encode_str("ty:EF532M V02.03")
-    return write_buffer
+from juracoffeemachine import JuraProtocol, CoffeeMaker, JuraCommand, HZ, Response, CS, CoffeeStatistics
 
 
-def test_brew_coffee():
-    t = ValidSerial()
-    write_buffer = init_seq_coffee_brew(t)
-    write_buffer += encode_str("RE:00D6")
-    t.read_buffer += encode_str("re:0031")
-    write_buffer += encode_str("RE:013C")
-    t.read_buffer += encode_str("re:0014")
-    write_buffer += encode_str("WE:00D6,0011")
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str("WE:013C,0012")
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str(JuraCommand.BUTTON_4)
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000000000000000")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000011C00000000")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000011C00000000")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000011C00000000")
+class MockProtocol(JuraProtocol):
 
-    def callback():
-        assert False
+    def __init__(self):
+        pass
 
-    result = [False]
+    def write_with_response(self, data: str, timeout: float = 3) -> Optional[str]:
+        pass
 
-    def _cb(_b):
-        result[0] = True
+    def get_and_parse_message(self, command: JuraCommand, raw: Optional[str] = None) -> Optional[Response]:
+        pass
 
-    p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
-    m = CoffeeMaker(p)
-    m.brew_coffee((CoffeeMaker.coffee_bean_param[1] - 2),
-                  (CoffeeMaker.water_volume_param[1] - CoffeeMaker.water_volume_param[3] * 2),
-                  _cb)
+    def set_coffee_param(self, coffee_bean: int, water_volume: int) -> bool:
+        pass
 
-    while not result[0]:
-        time.sleep(1)
+    def read_eeprom(self, address: int, use_rt: bool = False) -> Optional[int]:
+        pass
 
-    assert t.read_index == len(t.read_buffer)
-    assert t.write_buffer == write_buffer
+    def reopen_serial(self):
+        pass
+
+    def reset_streams(self):
+        pass
 
 
-def test_reset_coffee_param_valid():
-    t = ValidSerial()
-    write_buffer = init_seq_coffee_brew(t)
-    write_buffer += encode_str("RE:00D6")
-    t.read_buffer += encode_str("re:0041")
-    write_buffer += encode_str("RE:013C")
-    t.read_buffer += encode_str("re:0015")
-    write_buffer += encode_str("WE:00D6,0031")
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str("WE:013C,0014")
-    t.read_buffer += encode_str("ok:")
+@pytest.mark.parametrize(
+    ("coffee_bean", "water_volume", "hz", "grounds", "can_brew"),
+    [
+        (1, 50, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (4, 25, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (4, 100, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None, False),
+        (3, 110, None, 1000, False),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100, False),
+        (3, 110, HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, False),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000, False),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000, False),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000, False),
+    ],
+)
+def test_brew_coffee(mocker,
+                     coffee_bean, water_volume,
+                     hz, grounds,
+                     can_brew):
+    p = MockProtocol()
 
-    def callback():
-        assert False
+    set_coffee_param_mock = mocker.patch.object(p, "set_coffee_param")
+    write_with_response_mock = mocker.patch.object(p, "write_with_response")
+    get_and_parse_message_mock = mocker.patch.object(p, "get_and_parse_message")
+    read_eeprom_mock = mocker.patch.object(p, "read_eeprom")
 
-    result = [False]
+    write_with_response_mock.side_effect = [
+        CoffeeMaker.type,
+        CoffeeMaker.bootloader,
+        "ok:"
+    ]
 
-    def _cb(_b):
-        result[0] = True
+    get_and_parse_message_mock.side_effect = [
+        hz,
+        CS("cs:03770000000ED000000000000006000000000000000"),
+        CS("cs:03770000000ED000000000000006000011C00000000"),
+        CS("cs:03770000000ED000000000000006000011C00000000"),
+        CS("cs:03770000000ED000000000000006000011C00000000"),
+    ]
 
-    p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
-    m = CoffeeMaker(p)
-    m.reset_coffee_param(_cb)
+    read_eeprom_mock.side_effect = [
+        grounds
+    ]
 
-    while not result[0]:
-        time.sleep(1)
+    set_coffee_param_mock.side_effect = [
+        True
+    ]
 
-    assert t.read_index == len(t.read_buffer)
-    assert t.write_buffer == write_buffer
+    done = Event()
+    callback_result = [None]
+
+    def _callback(result):
+        callback_result[0] = result
+        done.set()
+
+    maker = CoffeeMaker(p)
+    maker.brew_coffee(coffee_bean, water_volume, _callback)
+
+    done.wait(timeout=100)
+    assert callback_result[0] == can_brew
+    write_with_response_mock.assert_any_call(JuraCommand.GET_TYPE)
+    write_with_response_mock.assert_any_call(JuraCommand.GET_LOADER)
+
+    if can_brew:
+        set_coffee_param_mock.assert_called_once_with(coffee_bean, water_volume)
+        write_with_response_mock.assert_any_call(CoffeeMaker.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE])
+        get_and_parse_message_mock.assert_any_call(JuraCommand.CS)
+    else:
+        set_coffee_param_mock.assert_not_called()
+        assert not any(call == call(CoffeeMaker.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE])
+                       for call in write_with_response_mock.call_args_list)
 
 
-def test_brew_then_reset():
-    t = ValidSerial()
-    write_buffer = init_seq_coffee_brew(t)
-    write_buffer += encode_str("RE:00D6")
-    t.read_buffer += encode_str("re:0031")
-    write_buffer += encode_str("RE:013C")
-    t.read_buffer += encode_str("re:0014")
-    write_buffer += encode_str("WE:00D6,0011")
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str("WE:013C,0012")
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str(JuraCommand.BUTTON_4)
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000000000000000")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000011C00000000")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000011C00000000")
-    write_buffer += encode_str("CS:")
-    t.read_buffer += encode_str("cs:03770000000ED000000000000006000011C00000000")
-    write_buffer += encode_str("TY:")
-    t.read_buffer += encode_str("ty:EF532M V02.03")
-    write_buffer += encode_str("RE:00D6")
-    t.read_buffer += encode_str("re:0041")
-    write_buffer += encode_str("RE:013C")
-    t.read_buffer += encode_str("re:0015")
-    write_buffer += encode_str("WE:00D6,0031")
-    t.read_buffer += encode_str("ok:")
-    write_buffer += encode_str("WE:013C,0014")
-    t.read_buffer += encode_str("ok:")
+@pytest.mark.parametrize(
+    ("hz", "grounds", "can_brew"),
+    [
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None, False),
+        (None, 1000, False),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100, False),
+        (HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, False),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000, False),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000, False),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000, False),
+    ],
+)
+def test_can_brew(mocker,
+                  hz, grounds,
+                  can_brew):
+    p = MockProtocol()
 
-    def callback():
-        assert False
+    write_with_response_mock = mocker.patch.object(p, "write_with_response")
+    get_and_parse_message_mock = mocker.patch.object(p, "get_and_parse_message")
+    read_eeprom_mock = mocker.patch.object(p, "read_eeprom")
 
-    result = [False]
+    write_with_response_mock.side_effect = [CoffeeMaker.type,
+                                            CoffeeMaker.bootloader]
+    get_and_parse_message_mock.side_effect = [hz]
+    read_eeprom_mock.side_effect = [grounds]
 
-    def _cb(_b):
-        result[0] = True
+    done = Event()
+    callback_result = [None]
 
-    p = JuraProtocol(t, unexpected_msg_callback=lambda c: callback())
-    m = CoffeeMaker(p)
-    m.brew_coffee((CoffeeMaker.coffee_bean_param[1] - 2),
-                  (CoffeeMaker.water_volume_param[1] - CoffeeMaker.water_volume_param[3] * 2),
-                  _cb)
-    m.reset_coffee_param(_cb)
+    def _callback(result):
+        callback_result[0] = result
+        done.set()
 
-    while not result[0]:
-        time.sleep(1)
+    maker = CoffeeMaker(p)
+    maker.can_brew(_callback)
 
-    assert t.read_index == len(t.read_buffer)
-    assert t.write_buffer == write_buffer
+    done.wait(timeout=100)
+    assert callback_result[0] == can_brew
+    write_with_response_mock.assert_any_call(JuraCommand.GET_TYPE)
+    write_with_response_mock.assert_any_call(JuraCommand.GET_LOADER)
 
+
+def test_reset_coffee_param(mocker):
+    p = MockProtocol()
+
+    write_with_response_mock = mocker.patch.object(p, "write_with_response")
+    write_with_response_mock.side_effect = [CoffeeMaker.type,
+                                            CoffeeMaker.bootloader]
+    set_coffee_param_mock = mocker.patch.object(p, "set_coffee_param", return_value=True)
+
+    done = Event()
+    callback_result = [None]
+
+    def _callback(result):
+        callback_result[0] = result
+        done.set()
+
+    maker = CoffeeMaker(p)
+    maker.reset_coffee_param(_callback)
+
+    done.wait(timeout=100)
+    assert callback_result[0] == True
+    write_with_response_mock.assert_any_call(JuraCommand.GET_TYPE)
+    write_with_response_mock.assert_any_call(JuraCommand.GET_LOADER)
+    set_coffee_param_mock.assert_called_once_with(JuraProtocol.coffee_param[1], JuraProtocol.water_param[1])
+
+
+@pytest.mark.parametrize(
+    ("values",),
+    [
+        ((1, 2, 3, 4, 5, 6, 7),),
+        ((1, None, 3, None, 5, 6, 7),),
+    ],
+)
+def test_totals_statistics(mocker, values: Tuple[Optional[int], ...]):
+    p = MockProtocol()
+
+    write_with_response_mock = mocker.patch.object(p, "write_with_response")
+    write_with_response_mock.side_effect = [CoffeeMaker.type,
+                                            CoffeeMaker.bootloader]
+    read_eeprom_mock = mocker.patch.object(p, "read_eeprom")
+    read_eeprom_mock.side_effect = values
+
+    done = Event()
+    callback_result = [None]
+
+    def _callback(result):
+        callback_result[0] = result
+        done.set()
+
+    maker = CoffeeMaker(p)
+    maker.get_totals_statistics(_callback)
+
+    done.wait(timeout=100)
+    assert callback_result[0] == CoffeeStatistics(*values)
+    write_with_response_mock.assert_any_call(JuraCommand.GET_TYPE)
+    write_with_response_mock.assert_any_call(JuraCommand.GET_LOADER)
+
+
+@pytest.mark.parametrize(
+    ("responses", "result_first_call", "result_second_call", "jura_version_verified"),
+    [
+        ((CoffeeMaker.type, CoffeeMaker.bootloader, CoffeeMaker.type), True, True, True),
+        ((None, None, None,
+          None, None, None), False, False, False),
+        ((None, None, None,
+          CoffeeMaker.type, CoffeeMaker.bootloader), False, True, True),
+    ],
+)
+def test_check_connection(mocker, responses, result_first_call, result_second_call, jura_version_verified):
+    p = MockProtocol()
+
+    write_with_response_mock = mocker.patch.object(p, "write_with_response")
+    write_with_response_mock.side_effect = responses
+
+    maker = CoffeeMaker(p)
+    assert maker.__check_connection__() == result_first_call
+    assert maker.__check_connection__() == result_second_call
+    assert maker.get_last_status().jura_version_verified == jura_version_verified
