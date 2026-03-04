@@ -7,7 +7,7 @@ packages = ["juracoffeemachine"]
 
 [project]
 name = "juracoffeemachine"
-version = "1.0.0"
+version = "1.1.0"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { file = "LICENSE" }

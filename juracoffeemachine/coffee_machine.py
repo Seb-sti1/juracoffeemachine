@@ -15,45 +15,40 @@ from juracoffeemachine.serial import JuraSerial
 logger = logging.getLogger(__name__)
 
 
+class CoffeeType(IntEnum):
+    ESPRESSO = 0
+    RISTRETTO = 1
+    COFFEE = 2
+    SPECIAL = 3
+
+
+class CoffeeMakerResult(IntEnum):
+    OK = 0
+
+    CANNOT_COMMUNICATE = 10
+    CANNOT_FETCH_HZ = 11
+    CANNOT_FETCH_GROUNDS_TANK = 12
+    CANNOT_SET_PARAM = 13
+    CANNOT_PRESS_BTN = 14
+
+    SLEEPING = 20
+    DRAINING_TRAY_FULL = 21
+    DRAINING_TRAY_MISSING = 22
+    WATER_TANK_MISSING = 23
+    GROUNDS_TANK_FULL = 24
+
+
+class BrewingStage(IntEnum):
+    CHECKING_AVAILABILITY = 0
+    SETTING_PARAM = 1
+    PRESSING_BTN = 2
+    BREWING = 3
+
+
 @dataclass
-class FullStatus:
-    jura_version_verified: bool
-
-    last_valid_contact: Optional[datetime]
-
+class BrewingStatus:
+    stage: BrewingStage
     water_volume: Optional[float]
-
-    last_hz: Optional[HZ]
-    last_hz_date: Optional[datetime]
-
-    last_coffee_grounds_tank: Optional[int]
-    last_coffee_grounds_tank_date: Optional[datetime]
-
-    def can_brew(self) -> bool:
-        if self.last_hz is None:
-            return False
-        if self.last_hz.is_sleeping:
-            return False
-        if self.last_hz.is_draining_tray_full:
-            return False
-        if not self.last_hz.is_draining_tray_present:
-            return False
-        if not self.last_hz.is_water_tank_present:
-            return False
-        if self.last_coffee_grounds_tank is None or self.last_coffee_grounds_tank >= 1100:
-            return False
-        return True
-
-    def __str__(self):
-        valid_contact_str = "None"
-        if self.last_valid_contact is not None:
-            valid_contact_str = str(datetime.now(timezone.utc) - self.last_valid_contact).split('.')[0]
-
-        return (f"FullStatus[version {'' if self.jura_version_verified else 'not'} ok,"
-                f" {valid_contact_str} ago, wv {self.water_volume}, {'' if self.can_brew() else 'not'} ready]")
-
-    def __repr__(self):
-        return str(self)
 
 
 @dataclass
@@ -68,12 +63,6 @@ class CoffeeStatistics:
 
 
 class CoffeeMaker:
-    class CoffeeType(IntEnum):
-        ESPRESSO = 0
-        RISTRETTO = 1
-        COFFEE = 2
-        SPECIAL = 3
-
     # Mapping coffee type to button
     coffee_button_map = {
         CoffeeType.ESPRESSO: JuraCommand.BUTTON_1,
@@ -91,11 +80,13 @@ class CoffeeMaker:
 
     def __init__(self, protocol: JuraProtocol):
         self.jura: JuraProtocol = protocol
+        self.last_valid_contact: Optional[datetime] = None
+        self.jura_version_verified: bool = False
 
         self.__comm_lock__ = Lock()
         self.__brew_threads__: List[Thread] = []
 
-        self.__status__ = FullStatus(False, None, None, None, None, None, None)
+        self.__brewing_status__ = None
 
     @staticmethod
     def create_from_uart(port: str) -> CoffeeMaker:
@@ -104,16 +95,16 @@ class CoffeeMaker:
     # ====================== Status
 
     def __update_last_contact__(self):
-        self.__status__.last_valid_contact = datetime.now(timezone.utc)
+        self.last_valid_contact = datetime.now(timezone.utc)
 
-    def get_last_status(self) -> FullStatus:
-        return self.__status__
+    def get_brewing_status(self) -> BrewingStatus:
+        return self.__brewing_status__
 
     # ====================== Communication checks
 
     def __test_connection__(self) -> Tuple[bool, Optional[bool]]:
         try:
-            if not self.__status__.jura_version_verified:
+            if not self.jura_version_verified:
                 logger.info("Coffee Maker connected.")
                 response = self.jura.write_with_response(JuraCommand.GET_TYPE)
                 if response != self.type:
@@ -124,7 +115,7 @@ class CoffeeMaker:
                 if response != self.bootloader:
                     logger.error(f"This code was created for '{self.bootloader}' machine not '{response}'.")
                     return False, None
-                self.__status__.jura_version_verified = True
+                self.jura_version_verified = True
                 self.__update_last_contact__()
                 logger.info("Coffee Maker connected.")
                 return True, None
@@ -171,37 +162,56 @@ class CoffeeMaker:
         else:
             return self.__check_connection__(is_invalid, _tries_left - 1)
 
-    def __check_availability__(self) -> bool:
+    @staticmethod
+    def __is_hz_valid__(hz: HZ) -> CoffeeMakerResult:
+        if hz.is_sleeping:
+            return CoffeeMakerResult.SLEEPING
+        if hz.is_draining_tray_full:
+            return CoffeeMakerResult.DRAINING_TRAY_FULL
+        if not hz.is_draining_tray_present:
+            return CoffeeMakerResult.DRAINING_TRAY_MISSING
+        if not hz.is_water_tank_present:
+            return CoffeeMakerResult.WATER_TANK_MISSING
+        return CoffeeMakerResult.OK
+
+    @staticmethod
+    def __is_grounds_valid__(grounds: int) -> CoffeeMakerResult:
+        if grounds >= 1100:
+            return CoffeeMakerResult.GROUNDS_TANK_FULL
+        return CoffeeMakerResult.OK
+
+    def __check_availability__(self) -> CoffeeMakerResult:
         if not self.__check_connection__():
-            return False
+            return CoffeeMakerResult.CANNOT_COMMUNICATE
 
         try:
             hz = self.jura.get_and_parse_message(JuraCommand.HZ)
             if hz is None:
-                return False
+                return CoffeeMakerResult.CANNOT_FETCH_HZ
             self.__update_last_contact__()
-            self.__status__.last_hz = hz
-            self.__status__.last_hz_date = datetime.now()
+            r = self.__is_hz_valid__(hz)
+            if r != CoffeeMakerResult.OK:
+                return r
 
             grounds = self.jura.read_eeprom(int(JuraAddress.COFFEE_GROUNDS_TANK.value))
             if grounds is None:
-                return False
+                return CoffeeMakerResult.CANNOT_FETCH_GROUNDS_TANK
             self.__update_last_contact__()
-            self.__status__.last_coffee_grounds_tank = grounds
-            self.__status__.last_coffee_grounds_tank_date = datetime.now()
+            r = self.__is_grounds_valid__(grounds)
+            if r != CoffeeMakerResult.OK:
+                return r
+            return CoffeeMakerResult.OK
         except EmptyResponse:
-            return False
+            return CoffeeMakerResult.CANNOT_COMMUNICATE
         except InvalidResponse:
-            return False
-
-        return self.get_last_status().can_brew()
+            return CoffeeMakerResult.CANNOT_COMMUNICATE
 
     # ====================== Actions
 
-    def can_brew(self, cb: Callable[[bool], None]):
+    def can_brew(self, cb: Callable[[CoffeeMakerResult], None]):
         """
         Check if the jura is ready to brew a coffee.
-        To monitor more closely the status of the jura use the CoffeeMaker::get_last_status method.
+        To monitor more closely the status of the jura use the CoffeeMaker::get_brewing_status method.
 
         :param cb: Callback indicating if the jura is ready
         """
@@ -219,7 +229,7 @@ class CoffeeMaker:
         t.start()
         self.__brew_threads__.append(t)
 
-    def brew_coffee(self, coffee_bean: int, water_volume: int, cb: Callable[[bool], None]):
+    def brew_coffee(self, coffee_bean: int, water_volume: int, cb: Callable[[CoffeeMakerResult], None]):
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -228,16 +238,19 @@ class CoffeeMaker:
         :param cb: callback when it ends, returns if the coffee was brewed
         """
 
-        def _end(result):
+        def _end(result: CoffeeMakerResult):
             cb(result)
             self.__comm_lock__.release()
             return None
 
         def _exec():
             self.__comm_lock__.acquire()
-            if not self.__check_availability__():
-                logger.warning(f"Cannot brew, status is {self.get_last_status()}.")
-                return _end(False)
+            self.__brewing_status__ = BrewingStatus(BrewingStage.CHECKING_AVAILABILITY, None)
+            r = self.__check_availability__()
+            if r != CoffeeMakerResult.OK:
+                logger.warning(f"Cannot brew, not available: {r.name}.")
+                return _end(r)
+            self.__brewing_status__ = BrewingStatus(BrewingStage.SETTING_PARAM, None)
 
             try:
                 _coffee_bean = max(self.jura.coffee_param[0],
@@ -246,13 +259,15 @@ class CoffeeMaker:
                                     min(self.jura.water_param[2], water_volume))
                 if not self.jura.set_coffee_param(_coffee_bean, _water_volume):
                     logger.error("Could not send coffee params.")
-                    return _end(False)
+                    return _end(CoffeeMakerResult.CANNOT_SET_PARAM)
                 self.__update_last_contact__()
+                self.__brewing_status__ = BrewingStatus(BrewingStage.PRESSING_BTN, None)
                 # FIXME this is not enough to confirm a coffee was started
-                if self.jura.write_with_response(self.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE]) != "ok:":
+                if self.jura.write_with_response(self.coffee_button_map[CoffeeType.COFFEE]) != "ok:":
                     logger.warning("Could not press button.")
-                    return _end(False)
+                    return _end(CoffeeMakerResult.CANNOT_PRESS_BTN)
                 self.__update_last_contact__()
+                self.__brewing_status__ = BrewingStatus(BrewingStage.BREWING, None)
                 # TODO detect start of coffee
                 logger.info(f"Brewing {_coffee_bean} beans and {_water_volume} mL.")
                 start_time = time.time()
@@ -279,7 +294,7 @@ class CoffeeMaker:
                         last_water_sensor_values = last_water_sensor_values[1:4]
                         end_detected = last_water_sensor_values[0] not in [0, initial_water_sensor_value] and \
                                        all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
-                        self.__status__.water_volume = int(
+                        self.__brewing_status__.water_volume = int(
                             last_water_sensor_values[-1] / self.jura.water_sensor_to_water_value)
                 if end_detected:
                     logger.info(f"Coffee was brewed!")
@@ -287,13 +302,14 @@ class CoffeeMaker:
                 else:
                     logger.warning(f"Coffee ending could not be detected.")
 
-                self.__status__.water_volume = None
-                return _end(True)
+                self.__brewing_status__.water_volume = None
+                return _end(CoffeeMakerResult.OK)
             except EmptyResponse:
                 logger.fatal(f"Received empty response while trying to brew_coffee.")
+                return _end(CoffeeMakerResult.CANNOT_COMMUNICATE)
             except InvalidResponse as e:
                 logger.fatal(f"Received invalid response: {e} while trying to brew_coffee.")
-            return _end(False)
+                return _end(CoffeeMakerResult.CANNOT_COMMUNICATE)
 
         t = Thread(target=_exec)
         t.start()
@@ -314,7 +330,7 @@ class CoffeeMaker:
         def _exec():
             self.__comm_lock__.acquire()
             if not self.__check_connection__():
-                logger.warning(f"Cannot reset param, status is {self.get_last_status()}.")
+                logger.warning(f"Cannot reset param: can't communicate.")
                 return _end(False)
             try:
                 r = self.jura.set_coffee_param(self.jura.coffee_param[1], self.jura.water_param[1])
@@ -340,7 +356,7 @@ class CoffeeMaker:
         def _exec():
             self.__comm_lock__.acquire()
             if not self.__check_connection__():
-                logger.warning(f"Cannot get statistics, status is {self.get_last_status()}.")
+                logger.warning(f"Cannot get statistics: can't communicate.")
                 return _end(None)
             try:
                 logger.debug("Fetching statistics.")

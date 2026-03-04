@@ -3,7 +3,8 @@ from typing import Optional, Tuple
 
 import pytest
 
-from juracoffeemachine import JuraProtocol, CoffeeMaker, JuraCommand, HZ, Response, CS, CoffeeStatistics
+from juracoffeemachine import JuraProtocol, CoffeeMaker, JuraCommand, HZ, Response, CS, CoffeeStatistics, \
+    CoffeeMakerResult, CoffeeType
 
 
 class MockProtocol(JuraProtocol):
@@ -31,25 +32,32 @@ class MockProtocol(JuraProtocol):
 
 
 @pytest.mark.parametrize(
-    ("coffee_bean", "water_volume", "hz", "grounds", "can_brew"),
+    ("coffee_bean", "water_volume", "hz", "grounds", "result"),
     [
-        (1, 50, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (4, 25, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (4, 100, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None, False),
-        (3, 110, None, 1000, False),
-        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100, False),
-        (3, 110, HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, False),
-        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000, False),
-        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000, False),
-        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000, False),
+        (1, 50, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (4, 25, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (4, 100, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None,
+         CoffeeMakerResult.CANNOT_FETCH_GROUNDS_TANK),
+        (3, 110, None, 1000,
+         CoffeeMakerResult.CANNOT_FETCH_HZ),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100,
+         CoffeeMakerResult.GROUNDS_TANK_FULL),
+        (3, 110, HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000,
+         CoffeeMakerResult.SLEEPING),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000,
+         CoffeeMakerResult.DRAINING_TRAY_FULL),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000,
+         CoffeeMakerResult.DRAINING_TRAY_MISSING),
+        (3, 110, HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000,
+         CoffeeMakerResult.WATER_TANK_MISSING),
     ],
 )
 def test_brew_coffee(mocker,
                      coffee_bean, water_volume,
                      hz, grounds,
-                     can_brew):
+                     result):
     p = MockProtocol()
 
     set_coffee_param_mock = mocker.patch.object(p, "set_coffee_param")
@@ -90,39 +98,45 @@ def test_brew_coffee(mocker,
     maker.brew_coffee(coffee_bean, water_volume, _callback)
 
     done.wait(timeout=100)
-    assert callback_result[0] == can_brew
+    assert callback_result[0] == result
     write_with_response_mock.assert_any_call(JuraCommand.GET_TYPE)
     write_with_response_mock.assert_any_call(JuraCommand.GET_LOADER)
 
-    if can_brew:
+    if result == CoffeeMakerResult.OK:
         set_coffee_param_mock.assert_called_once_with(coffee_bean, water_volume)
-        write_with_response_mock.assert_any_call(CoffeeMaker.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE])
+        write_with_response_mock.assert_any_call(CoffeeMaker.coffee_button_map[CoffeeType.COFFEE])
         get_and_parse_message_mock.assert_any_call(JuraCommand.CS)
     else:
         set_coffee_param_mock.assert_not_called()
-        assert not any(call == call(CoffeeMaker.coffee_button_map[CoffeeMaker.CoffeeType.COFFEE])
+        assert not any(call == call(CoffeeMaker.coffee_button_map[CoffeeType.COFFEE])
                        for call in write_with_response_mock.call_args_list)
 
-
 @pytest.mark.parametrize(
-    ("hz", "grounds", "can_brew"),
+    ("hz", "grounds", "result"),
     [
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, True),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None, False),
-        (None, 1000, False),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100, False),
-        (HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, False),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000, False),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000, False),
-        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000, False),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None,
+        CoffeeMakerResult.CANNOT_FETCH_GROUNDS_TANK),
+        (None, 1000,
+        CoffeeMakerResult.CANNOT_FETCH_HZ),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100,
+        CoffeeMakerResult.GROUNDS_TANK_FULL),
+        (HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000,
+        CoffeeMakerResult.SLEEPING),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000,
+        CoffeeMakerResult.DRAINING_TRAY_FULL),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000,
+        CoffeeMakerResult.DRAINING_TRAY_MISSING),
+        (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000,
+        CoffeeMakerResult.WATER_TANK_MISSING),
     ],
 )
 def test_can_brew(mocker,
                   hz, grounds,
-                  can_brew):
+                  result):
     p = MockProtocol()
 
     write_with_response_mock = mocker.patch.object(p, "write_with_response")
@@ -145,7 +159,7 @@ def test_can_brew(mocker,
     maker.can_brew(_callback)
 
     done.wait(timeout=100)
-    assert callback_result[0] == can_brew
+    assert callback_result[0] == result
     write_with_response_mock.assert_any_call(JuraCommand.GET_TYPE)
     write_with_response_mock.assert_any_call(JuraCommand.GET_LOADER)
 
@@ -226,4 +240,4 @@ def test_check_connection(mocker, responses, result_first_call, result_second_ca
     maker = CoffeeMaker(p)
     assert maker.__check_connection__() == result_first_call
     assert maker.__check_connection__() == result_second_call
-    assert maker.get_last_status().jura_version_verified == jura_version_verified
+    assert maker.jura_version_verified == jura_version_verified
