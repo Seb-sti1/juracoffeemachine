@@ -240,6 +240,7 @@ class CoffeeMaker:
 
         def _end(result: CoffeeMakerResult):
             cb(result)
+            self.__brewing_status__ = None
             self.__comm_lock__.release()
             return None
 
@@ -302,7 +303,6 @@ class CoffeeMaker:
                 else:
                     logger.warning(f"Coffee ending could not be detected.")
 
-                self.__brewing_status__.water_volume = None
                 return _end(CoffeeMakerResult.OK)
             except EmptyResponse:
                 logger.fatal(f"Received empty response while trying to brew_coffee.")
