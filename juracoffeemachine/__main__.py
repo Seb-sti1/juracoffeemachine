@@ -83,6 +83,12 @@ def main():
             logger.info(f"{msg.raw}: {msg}")
 
         spin(_run)
+    elif args.action == "while_ic":
+        def _run():
+            msg = machin.jura.get_and_parse_message(JuraCommand.IC)
+            logger.info(f"{msg.raw}: {msg}")
+
+        spin(_run)
     elif args.action == "while_read":
         addr = int(args.address, 16)
         if addr < 0 or addr >= 0x400:
@@ -100,7 +106,8 @@ def main():
     elif args.action == "brew_coffee":
         machin.brew_coffee(2, 100, lambda v: logger.info(f"Volume is {v}"))
     elif args.action == "stop":
-        logger.info("Button acknowledge" if machin.stop(lambda _: None) else "Sent but not acknowledge")
+        logger.info("Button acknowledge" if machin.jura.write_with_response(JuraCommand.BUTTON_6) == ":ok"
+                    else "Sent but not acknowledge")
     elif args.action == "eeprom":
         machin.jura.dump_eeprom_to_file(Path(f"./eeprom{int(time.time())}.dump"))
     machin.jura.__serial__.close()
