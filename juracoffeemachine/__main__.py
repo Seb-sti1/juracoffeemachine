@@ -34,10 +34,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('port', default='/dev/ttyUSB0', help='Serial port (default: /dev/ttyUSB0)')
     parser.add_argument('action', choices=["ty", "hz", "cs", "stat",
-                                           "while_hz", "while_cs", "while_read",
-                                           "brew_coffee",
-                                           "stop",
-                                           "eeprom"],
+                                           "while_hz", "while_cs", "while_read", "while_ic",
+                                           "brew_coffee", "stop", "eeprom"],
                         help='The action to perform.')
     parser.add_argument('address', nargs='?', default="0x0000",
                         help="An address (in [0x0, 0x400[) to read.")
