@@ -102,6 +102,7 @@ class JuraProtocol:
     coffee_param = (1, 4, 8, 1)
     water_param = (25, 100, 240, 5)
     water_sensor_to_water_value = 2.18595512820513
+    pump_speed = 4.0  # mL/s
 
     def __init__(self, s: AbstractSerial, unexpected_msg_callback: Callable[[CircularBuffer], None]):
         self.__serial__ = s

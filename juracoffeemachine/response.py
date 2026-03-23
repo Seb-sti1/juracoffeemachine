@@ -50,6 +50,7 @@ class HZ(Response):
         assert m is not None
         group = m.groupdict()
 
+        # FIXME sometimes the machin can return non hex part
         self.is_sleeping = group["SLEEPING"] == "1"
         self.is_bowl_moving = group["BOWL_MOVING"] == "0"
         self.bowl_pos = int(group["BOWL_POS"], 16)

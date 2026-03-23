@@ -9,7 +9,7 @@ from threading import Lock, Thread
 from typing import Optional, Tuple, Callable, List
 
 from juracoffeemachine.jura import JuraProtocol, JuraCommand, JuraAddress, EmptyResponse, InvalidResponse
-from juracoffeemachine.response import HZ
+from juracoffeemachine.response import HZ, CS
 from juracoffeemachine.serial import JuraSerial
 
 logger = logging.getLogger(__name__)
@@ -30,12 +30,14 @@ class CoffeeMakerResult(IntEnum):
     CANNOT_FETCH_GROUNDS_TANK = 12
     CANNOT_SET_PARAM = 13
     CANNOT_PRESS_BTN = 14
+    CANNOT_CONFIRM_SUCCESSFUL_COFFEE = 15
 
     SLEEPING = 20
     DRAINING_TRAY_FULL = 21
     DRAINING_TRAY_MISSING = 22
     WATER_TANK_MISSING = 23
     GROUNDS_TANK_FULL = 24
+    MISSING_COFFEE = 25
 
 
 class BrewingStage(IntEnum):
@@ -49,6 +51,7 @@ class BrewingStage(IntEnum):
 class BrewingStatus:
     stage: BrewingStage
     water_volume: Optional[float]
+    last_msg: Optional[HZ | CS]
 
 
 @dataclass
@@ -172,6 +175,9 @@ class CoffeeMaker:
             return CoffeeMakerResult.DRAINING_TRAY_MISSING
         if not hz.is_water_tank_present:
             return CoffeeMakerResult.WATER_TANK_MISSING
+        # TODO confirm or find the MISSING_COFFEE flag
+        # if not hz.missing_coffee:
+        #     return CoffeeMakerResult.MISSING_COFFEE
         return CoffeeMakerResult.OK
 
     @staticmethod
@@ -246,12 +252,12 @@ class CoffeeMaker:
 
         def _exec():
             self.__comm_lock__.acquire()
-            self.__brewing_status__ = BrewingStatus(BrewingStage.CHECKING_AVAILABILITY, None)
+            self.__brewing_status__ = BrewingStatus(BrewingStage.CHECKING_AVAILABILITY, None, None)
             r = self.__check_availability__()
             if r != CoffeeMakerResult.OK:
                 logger.warning(f"Cannot brew, not available: {r.name}.")
                 return _end(r)
-            self.__brewing_status__ = BrewingStatus(BrewingStage.SETTING_PARAM, None)
+            self.__brewing_status__ = BrewingStatus(BrewingStage.SETTING_PARAM, None, None)
 
             try:
                 _coffee_bean = max(self.jura.coffee_param[0],
@@ -262,48 +268,90 @@ class CoffeeMaker:
                     logger.error("Could not send coffee params.")
                     return _end(CoffeeMakerResult.CANNOT_SET_PARAM)
                 self.__update_last_contact__()
-                self.__brewing_status__ = BrewingStatus(BrewingStage.PRESSING_BTN, None)
-                # FIXME this is not enough to confirm a coffee was started
+                self.__brewing_status__ = BrewingStatus(BrewingStage.PRESSING_BTN, None, None)
                 if self.jura.write_with_response(self.coffee_button_map[CoffeeType.COFFEE]) != "ok:":
                     logger.warning("Could not press button.")
                     return _end(CoffeeMakerResult.CANNOT_PRESS_BTN)
                 self.__update_last_contact__()
-                self.__brewing_status__ = BrewingStatus(BrewingStage.BREWING, None)
-                # TODO detect start of coffee
+                self.__brewing_status__ = BrewingStatus(BrewingStage.BREWING, None, None)
+                # for robustness purposes the following design choices were made:
+                #   - the program first monitor hz: this makes it possible to check if there is no coffee left
+                #           while still monitoring water volume
+                #   - once there is a zero in water volume, (it seems) the machin performed its checks so that there is
+                #           no point in continuing to check for MISSING_COFFEE flag
+                #   - then, to increase frequency of monitoring (len(hz) > len(cs)), the program switches to monitor cs
+                #   - at this point it is (extremely) likely that the user will have its coffee but to further decrease
+                #           the chance of wrong detection, a coffee is considered served if there is at least > 0
+                #   - the possible issue with this is that, on a communication error (intentional or not) with the jura,
+                #           the coffee will not be paid. To avoid that, a coffee is also considered served if no msg
+                #           are received 7s after the water_val is reset to 0.
                 logger.info(f"Brewing {_coffee_bean} beans and {_water_volume} mL.")
                 start_time = time.time()
+                water_vol_reset_time = None
+                # after water_val is reset to 0, it stays at 0 for ~6s, there is a small bump for ~6s then it brew at
+                # a fixed pump speed. Finally, it takes 3 measurements (~3s) to detect the end of the coffee
+                # TODO estimate duration from the start_time
+                estimated_duration = 6 + 6 + _water_volume / self.jura.pump_speed + 3
                 end_detected = False
-                initial_water_sensor_value = None
+                msg_type = JuraCommand.HZ
+                read_non_zero_water_value = False
+                is_successfully_brewed = False
                 last_water_sensor_values = [0, 0, 0]
-
-                while (time.time() - start_time) < 90 and not end_detected:
-                    cs = None
+                all_sensors_values = []
+                while not end_detected and \
+                        (water_vol_reset_time is None or (time.time() - water_vol_reset_time) < estimated_duration + 10) \
+                        and (time.time() - start_time) < 90 :
+                    msg = None
                     try:
-                        cs = self.jura.get_and_parse_message(JuraCommand.CS)
+                        msg = self.jura.get_and_parse_message(msg_type)
                         self.__update_last_contact__()
                     except EmptyResponse:
                         logger.warning(f"Received empty response.")
                     except InvalidResponse as e:
                         logger.warning(f"Received invalid response: {e}.")
 
-                    if cs is None:
+                    if msg is None:
                         logger.warning(f"Received cs == None.")
                     else:
-                        last_water_sensor_values.append(cs.water_vol)
-                        if (time.time() - start_time) < 5 and initial_water_sensor_value is None:
-                            initial_water_sensor_value = cs.water_vol
-                        last_water_sensor_values = last_water_sensor_values[1:4]
-                        end_detected = last_water_sensor_values[0] not in [0, initial_water_sensor_value] and \
-                                       all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
-                        self.__brewing_status__.water_volume = int(
-                            last_water_sensor_values[-1] / self.jura.water_sensor_to_water_value)
+                        all_sensors_values.append(msg.water_vol)
+                        self.__brewing_status__.last_msg = msg
+                        if msg_type == JuraCommand.HZ:
+                            # the MISSING_COFFEE flag is updated in the last message before the water_vol goes to 0
+                            # TODO confirm or find the MISSING_COFFEE flag
+                            # if msg.missing_coffee:
+                            #     return CoffeeMakerResult.MISSING_COFFEE
+                            # the water_vol value stays at 0 for about 5s so that it should be seen at least 4 times.
+                            # the probably of missing this is low.
+                            if msg.water_vol == 0:
+                                water_vol_reset_time = time.time()
+                                # at this point (unless newer data change this) the coffee is considered successful
+                                is_successfully_brewed = True
+                                msg_type = JuraCommand.CS
+                        elif msg_type == JuraCommand.CS:
+                            # when a water_vol > 0 is read, the coffee is considered successful no matter what
+                            if msg.water_vol > 0:
+                                logger.info(f"{msg.water_vol} > 0, the coffee is considered successful.")
+                                is_successfully_brewed = True
+                                read_non_zero_water_value = True
+                            # for a nominal coffee, water_vol should be > 0 after ~5s of resetting water_vol to 0.
+                            # so if after 7s of resetting water_vol to 0, no water_vol > 0 were measured, the coffee is
+                            # considered unsuccessful (unless later measurements shows water_vol > 0)
+                            if time.time() - water_vol_reset_time > 7 and not read_non_zero_water_value:
+                                is_successfully_brewed = False
+                            # this is relating to detecting the end of the coffee (3 consecutive identical values)
+                            if msg.water_vol > 0:
+                                last_water_sensor_values = last_water_sensor_values[1:3] + [msg.water_vol]
+                                end_detected = last_water_sensor_values[0] != 0 and \
+                                               all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
+                                self.__brewing_status__.water_volume = int(
+                                    last_water_sensor_values[-1] / self.jura.water_sensor_to_water_value)
+                logger.debug(",".join(map(str, all_sensors_values)))
                 if end_detected:
-                    logger.info(f"Coffee was brewed!")
-                    logger.warning(f"Last water sensor: {last_water_sensor_values}.")
+                    logger.info(f"Coffee ending was properly detected.")
                 else:
                     logger.warning(f"Coffee ending could not be detected.")
-
-                return _end(CoffeeMakerResult.OK)
+                return _end(CoffeeMakerResult.OK if is_successfully_brewed else
+                            CoffeeMakerResult.CANNOT_CONFIRM_SUCCESSFUL_COFFEE)
             except EmptyResponse:
                 logger.fatal(f"Received empty response while trying to brew_coffee.")
                 return _end(CoffeeMakerResult.CANNOT_COMMUNICATE)
