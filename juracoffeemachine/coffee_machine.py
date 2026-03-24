@@ -300,7 +300,7 @@ class CoffeeMaker:
                 all_sensors_values = []
                 while not end_detected and \
                         (water_vol_reset_time is None or (time.time() - water_vol_reset_time) < estimated_duration + 10) \
-                        and (time.time() - start_time) < 90 :
+                        and (time.time() - start_time) < 90:
                     msg = None
                     try:
                         msg = self.jura.get_and_parse_message(msg_type)
@@ -315,6 +315,7 @@ class CoffeeMaker:
                     else:
                         all_sensors_values.append(msg.water_vol)
                         self.__brewing_status__.last_msg = msg
+                        self.__brewing_status__.water_volume = int(msg.water_vol / self.jura.sensor_to_water_value)
                         if msg_type == JuraCommand.HZ:
                             # the MISSING_COFFEE flag is updated in the last message before the water_vol goes to 0
                             # TODO confirm or find the MISSING_COFFEE flag
@@ -343,8 +344,6 @@ class CoffeeMaker:
                                 last_water_sensor_values = last_water_sensor_values[1:3] + [msg.water_vol]
                                 end_detected = last_water_sensor_values[0] != 0 and \
                                                all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
-                                self.__brewing_status__.water_volume = int(
-                                    last_water_sensor_values[-1] / self.jura.water_sensor_to_water_value)
                 logger.debug(",".join(map(str, all_sensors_values)))
                 if end_detected:
                     logger.info(f"Coffee ending was properly detected.")
