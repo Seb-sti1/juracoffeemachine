@@ -117,7 +117,6 @@ class CoffeeMaker:
     def __test_connection__(self) -> Tuple[bool, Optional[bool]]:
         try:
             if not self.jura_version_verified:
-                logger.info("Coffee Maker connected.")
                 response = self.jura.write_with_response(JuraCommand.GET_TYPE)
                 if response != self.type:
                     logger.error(f"This code was created for '{self.type}' machine not '{response}'.")
@@ -322,7 +321,7 @@ class CoffeeMaker:
                     if msg is None:
                         logger.warning(f"Received cs == None.")
                     else:
-                        all_sensors_values.append(msg.water_vol)
+                        all_sensors_values.append((time.time() - start_time, msg.water_vol))
                         self.__brewing_status__.last_msg = msg
                         self.__brewing_status__.water_volume = int(msg.water_vol / self.jura.sensor_to_water_value)
                         if msg_type == JuraCommand.HZ:
@@ -339,7 +338,7 @@ class CoffeeMaker:
                                 msg_type = JuraCommand.CS
                         elif msg_type == JuraCommand.CS:
                             # when a water_vol > 0 is read, the coffee is considered successful no matter what
-                            if msg.water_vol > 0:
+                            if msg.water_vol > 0 and not read_non_zero_water_value:
                                 logger.info(f"{msg.water_vol} > 0, the coffee is considered successful.")
                                 is_successfully_brewed = True
                                 read_non_zero_water_value = True
@@ -353,7 +352,7 @@ class CoffeeMaker:
                                 last_water_sensor_values = last_water_sensor_values[1:3] + [msg.water_vol]
                                 end_detected = last_water_sensor_values[0] != 0 and \
                                                all(v == last_water_sensor_values[0] for v in last_water_sensor_values)
-                logger.debug(",".join(map(str, all_sensors_values)))
+                logger.debug(";".join([f"{dt:.2f},{v}" for dt, v in all_sensors_values]))
                 if end_detected:
                     logger.info(f"Coffee ending was properly detected.")
                 else:
