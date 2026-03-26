@@ -15,6 +15,11 @@ from juracoffeemachine.serial import JuraSerial
 logger = logging.getLogger(__name__)
 
 
+try:
+    import RPi.GPIO as GPIO
+except:
+    logger.warning("This is not a RPI, it will not load RPi.GPIO module.")
+
 class CoffeeType(IntEnum):
     ESPRESSO = 0
     RISTRETTO = 1
@@ -81,10 +86,14 @@ class CoffeeMaker:
     type = "ty:EF532M V02.03"
     bootloader = "tl:BL_RL78 V01.31"
 
-    def __init__(self, protocol: JuraProtocol):
+    def __init__(self, protocol: JuraProtocol, power_gpio: Optional[int] = None):
         self.jura: JuraProtocol = protocol
         self.last_valid_contact: Optional[datetime] = None
         self.jura_version_verified: bool = False
+        self.__power_gpio__ = power_gpio
+        if self.__power_gpio__ is not None:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(self.__power_gpio__, GPIO.OUT)
 
         self.__comm_lock__ = Lock()
         self.__brew_threads__: List[Thread] = []
@@ -397,11 +406,17 @@ class CoffeeMaker:
 
         def _end(result):
             cb(result)
+            if self.__power_gpio__ is not None:
+                GPIO.output(self.__power_gpio__, False)
             self.__comm_lock__.release()
             return None
 
         def _exec():
             self.__comm_lock__.acquire()
+            if self.__power_gpio__ is not None:
+                GPIO.output(self.__power_gpio__, True)
+                time.sleep(0.1)
+
             if not self.__check_connection__():
                 logger.warning(f"Cannot get statistics: can't communicate.")
                 return _end(None)

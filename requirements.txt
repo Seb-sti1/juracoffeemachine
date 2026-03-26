@@ -1,5 +1,8 @@
-pyserial
 pytest
 pytest-mock
 coverage
+
 build
+
+pyserial
+RPi.GPIO
