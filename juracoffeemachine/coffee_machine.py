@@ -86,7 +86,7 @@ class CoffeeMaker:
     type = "ty:EF532M V02.03"
     bootloader = "tl:BL_RL78 V01.31"
 
-    def __init__(self, protocol: JuraProtocol, power_gpio: Optional[int] = None):
+    def __init__(self, protocol: JuraProtocol, power_gpio: Optional[int]):
         self.jura: JuraProtocol = protocol
         self.last_valid_contact: Optional[datetime] = None
         self.jura_version_verified: bool = False
@@ -101,8 +101,9 @@ class CoffeeMaker:
         self.__brewing_status__ = None
 
     @staticmethod
-    def create_from_uart(port: str) -> CoffeeMaker:
-        return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _: logger.error("Received unexpected message.")))
+    def create_from_uart(port: str, power_gpio: Optional[int] = None) -> CoffeeMaker:
+        return CoffeeMaker(JuraProtocol(JuraSerial(port), lambda _: logger.error("Received unexpected message.")),
+                           power_gpio)
 
     # ====================== Status
 

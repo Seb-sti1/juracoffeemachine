@@ -95,7 +95,7 @@ def test_brew_coffee(mocker,
         callback_result[0] = result
         done.set()
 
-    maker = CoffeeMaker(p)
+    maker = CoffeeMaker(p, None)
     maker.brew_coffee(coffee_bean, water_volume, _callback)
 
     done.wait(timeout=100)
@@ -156,7 +156,7 @@ def test_can_brew(mocker,
         callback_result[0] = result
         done.set()
 
-    maker = CoffeeMaker(p)
+    maker = CoffeeMaker(p, None)
     maker.can_brew(_callback)
 
     done.wait(timeout=100)
@@ -180,7 +180,7 @@ def test_reset_coffee_param(mocker):
         callback_result[0] = result
         done.set()
 
-    maker = CoffeeMaker(p)
+    maker = CoffeeMaker(p, None)
     maker.reset_coffee_param(_callback)
 
     done.wait(timeout=100)
@@ -213,7 +213,7 @@ def test_totals_statistics(mocker, values: Tuple[Optional[int], ...]):
         callback_result[0] = result
         done.set()
 
-    maker = CoffeeMaker(p)
+    maker = CoffeeMaker(p, None)
     maker.get_totals_statistics(_callback)
 
     done.wait(timeout=100)
@@ -238,7 +238,7 @@ def test_check_connection(mocker, responses, result_first_call, result_second_ca
     write_with_response_mock = mocker.patch.object(p, "write_with_response")
     write_with_response_mock.side_effect = responses
 
-    maker = CoffeeMaker(p)
+    maker = CoffeeMaker(p, None)
     assert maker.__check_connection__() == result_first_call
     assert maker.__check_connection__() == result_second_call
     assert maker.jura_version_verified == jura_version_verified
