@@ -14,11 +14,11 @@ from juracoffeemachine.serial import JuraSerial
 
 logger = logging.getLogger(__name__)
 
-
 try:
     import RPi.GPIO as GPIO
 except:
     logger.warning("This is not a RPI, it will not load RPi.GPIO module.")
+
 
 class CoffeeType(IntEnum):
     ESPRESSO = 0
@@ -406,17 +406,11 @@ class CoffeeMaker:
 
         def _end(result):
             cb(result)
-            if self.__power_gpio__ is not None:
-                GPIO.output(self.__power_gpio__, False)
             self.__comm_lock__.release()
             return None
 
         def _exec():
             self.__comm_lock__.acquire()
-            if self.__power_gpio__ is not None:
-                GPIO.output(self.__power_gpio__, True)
-                time.sleep(0.1)
-
             if not self.__check_connection__():
                 logger.warning(f"Cannot get statistics: can't communicate.")
                 return _end(None)
@@ -434,3 +428,14 @@ class CoffeeMaker:
         t = Thread(target=_exec)
         t.start()
         self.__brew_threads__.append(t)
+
+    def turn_on(self):
+        """
+        This trigger the GPIO to send a 5v signal to the Jura, effectively triggering the starting procedure of the jura
+        """
+        if self.__power_gpio__ is None:
+            logger.warning('No power GPIO specified, can\'t not turn on the jura.')
+            return
+        GPIO.output(self.__power_gpio__, True)
+        time.sleep(0.1)
+        GPIO.output(self.__power_gpio__, False)

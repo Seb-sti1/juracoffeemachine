@@ -35,7 +35,7 @@ def main():
     parser.add_argument('port', default='/dev/ttyUSB0', help='Serial port (default: /dev/ttyUSB0)')
     parser.add_argument('action', choices=["ty", "hz", "cs", "stat",
                                            "while_hz", "while_cs", "while_read", "while_ic",
-                                           "brew_coffee", "stop", "eeprom"],
+                                           "brew_coffee", "stop", "eeprom", "turn_on"],
                         help='The action to perform.')
     parser.add_argument('address', nargs='?', default="0x0000",
                         help="An address (in [0x0, 0x400[) to read.")
@@ -66,6 +66,8 @@ def main():
         logger.info(f"{msg.raw}: {msg}")
     elif args.action == "stat":
         machin.jura.log_statistics()
+    elif args.action == "turn_on":
+        machin.turn_on()
     elif args.action == "coffee_param":
         q, v = machin.jura.get_coffee_param()
         logger.info(f"{q} beans and {v} mL")
