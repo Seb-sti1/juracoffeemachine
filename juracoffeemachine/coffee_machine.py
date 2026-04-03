@@ -421,7 +421,6 @@ class CoffeeMaker:
                 logger.warning(f"Cannot get statistics: can't communicate.")
                 return _end(None)
             try:
-                logger.debug("Fetching statistics.")
                 r = self.jura.get_totals_statistics()
                 self.__update_last_contact__()
                 return _end(CoffeeStatistics(*r))
