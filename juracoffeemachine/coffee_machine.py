@@ -415,7 +415,7 @@ class CoffeeMaker:
             self.__comm_lock__.acquire()
             if self.__power_gpio__ is not None and use_power_gpio:
                 GPIO.output(self.__power_gpio__, True)
-                time.sleep(0.1)
+                time.sleep(0.5)
 
             if not self.__check_connection__():
                 logger.warning(f"Cannot get statistics: can't communicate.")
