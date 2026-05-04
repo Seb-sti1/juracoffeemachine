@@ -43,6 +43,8 @@ class CoffeeMakerResult(IntEnum):
     WATER_TANK_MISSING = 23
     GROUNDS_TANK_FULL = 24
     MISSING_COFFEE = 25
+    WARMING_UP = 26
+    BOWL_MOVING = 27
 
 
 class BrewingStage(IntEnum):
@@ -184,6 +186,10 @@ class CoffeeMaker:
             return CoffeeMakerResult.DRAINING_TRAY_MISSING
         if not hz.is_water_tank_present:
             return CoffeeMakerResult.WATER_TANK_MISSING
+        if hz.is_bowl_moving:
+            return CoffeeMakerResult.BOWL_MOVING
+        if hz.heater <= 850:
+            return CoffeeMakerResult.WARMING_UP
         # TODO confirm or find the MISSING_COFFEE flag
         # if not hz.missing_coffee:
         #     return CoffeeMakerResult.MISSING_COFFEE
