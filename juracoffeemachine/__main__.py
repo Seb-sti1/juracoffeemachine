@@ -7,7 +7,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Callable
 
-from juracoffeemachine import JuraCommand
+from juracoffeemachine import JuraCommand, CoffeeMakerResult
 from juracoffeemachine.coffee_machine import CoffeeMaker
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,28 @@ def spin(func: Callable[[], None]):
     t.start()
     input("Press any 'enter' to stop.")
     is_running = False
+    t.join()
+
+
+def interactive_brew(machin: CoffeeMaker):
+    bean = int(input("coffee bean (1-8):"))
+    vol = int(input("water volume (25-240):"))
+    is_running = threading.Event()
+    stop = threading.Event()
+
+    def _exec():
+        while not is_running.is_set():
+            if input("Write 's' to stop.") == "s":
+                stop.set()
+                break
+
+    def _cb(result: CoffeeMakerResult):
+        logger.info(f"Result is {result}")
+        stop.set()
+
+    t = threading.Thread(target=_exec)
+    t.start()
+    machin.brew_coffee(bean, vol, _cb, stop)
     t.join()
 
 
@@ -102,7 +124,7 @@ def main():
 
         spin(_run)
     elif args.action == "brew_coffee":
-        machin.brew_coffee(2, 100, lambda v: logger.info(f"Volume is {v}"))
+        interactive_brew(machin)
     elif args.action == "stop":
         logger.info("Button acknowledge" if machin.jura.write_with_response(JuraCommand.BUTTON_6) == ":ok"
                     else "Sent but not acknowledge")

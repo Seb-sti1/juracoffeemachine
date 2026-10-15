@@ -81,7 +81,8 @@ def test_brew_coffee(mocker,
     ]
 
     read_eeprom_mock.side_effect = [
-        grounds
+        grounds,
+        0, 0, 0, 0, 0, 1
     ]
 
     set_coffee_param_mock.side_effect = [
