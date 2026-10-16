@@ -38,9 +38,9 @@ def interactive_brew(machin: CoffeeMaker):
 
     def _exec():
         while not is_running.is_set():
-            if input("Write 's' to stop.") == "s":
+            if not stop.is_set() and input("Write 's' to stop.") == "s":
                 stop.set()
-                break
+            time.sleep(0.5)
 
     def _cb(result: CoffeeMakerResult):
         logger.info(f"Result is {result}")
