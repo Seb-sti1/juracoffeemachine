@@ -113,6 +113,7 @@ def test_brew_coffee(mocker,
         assert not any(call == call(CoffeeMaker.coffee_button_map[CoffeeType.COFFEE])
                        for call in write_with_response_mock.call_args_list)
 
+
 @pytest.mark.parametrize(
     ("hz", "grounds", "result"),
     [
@@ -121,19 +122,19 @@ def test_brew_coffee(mocker,
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000, CoffeeMakerResult.OK),
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), None,
-        CoffeeMakerResult.CANNOT_FETCH_GROUNDS_TANK),
+         CoffeeMakerResult.CANNOT_FETCH_GROUNDS_TANK),
         (None, 1000,
-        CoffeeMakerResult.CANNOT_FETCH_HZ),
+         CoffeeMakerResult.CANNOT_FETCH_HZ),
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1100,
-        CoffeeMakerResult.GROUNDS_TANK_FULL),
+         CoffeeMakerResult.GROUNDS_TANK_FULL),
         (HZ("hz:11010110000000,0288,00ED,0107,03E8,0000,0,0017,000100,12"), 1000,
-        CoffeeMakerResult.SLEEPING),
+         CoffeeMakerResult.SLEEPING),
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000101,12"), 1000,
-        CoffeeMakerResult.DRAINING_TRAY_FULL),
+         CoffeeMakerResult.DRAINING_TRAY_FULL),
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,000110,12"), 1000,
-        CoffeeMakerResult.DRAINING_TRAY_MISSING),
+         CoffeeMakerResult.DRAINING_TRAY_MISSING),
         (HZ("hz:01010110000000,0288,00ED,0107,03E8,0000,0,0017,010100,12"), 1000,
-        CoffeeMakerResult.WATER_TANK_MISSING),
+         CoffeeMakerResult.WATER_TANK_MISSING),
     ],
 )
 def test_can_brew(mocker,
