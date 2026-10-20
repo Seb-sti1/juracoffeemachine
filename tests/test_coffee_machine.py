@@ -92,7 +92,7 @@ def test_brew_coffee(mocker,
     done = Event()
     callback_result = [None]
 
-    def _callback(result):
+    def _callback(result, _date):
         callback_result[0] = result
         done.set()
 

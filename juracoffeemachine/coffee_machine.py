@@ -252,7 +252,7 @@ class CoffeeMaker:
         self.__brew_threads__.append(t)
 
     def brew_coffee(self, coffee_bean: int, water_volume: int,
-                    cb: Callable[[CoffeeMakerResult], None], stop: Optional[Event] = None):
+                    cb: Callable[[CoffeeMakerResult, datetime], None], stop: Optional[Event] = None):
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -262,8 +262,8 @@ class CoffeeMaker:
         :param cb: callback when it ends, returns if the coffee was brewed
         """
 
-        def _end(result: CoffeeMakerResult):
-            cb(result)
+        def _end(result: CoffeeMakerResult, date: datetime):
+            cb(result, date)
             self.__brewing_status__ = None
             self.__comm_lock__.release()
             return None
@@ -274,7 +274,7 @@ class CoffeeMaker:
             r = self.__check_availability__()
             if r != CoffeeMakerResult.OK:
                 logger.warning(f"Cannot brew, not available: {r.name}.")
-                return _end(r)
+                return _end(r, None)
             self.__brewing_status__ = BrewingStatus(BrewingStage.SETTING_PARAM, None, None)
 
             try:
@@ -284,12 +284,12 @@ class CoffeeMaker:
                                     min(self.jura.water_param[2], water_volume))
                 if not self.jura.set_coffee_param(_coffee_bean, _water_volume):
                     logger.error("Could not send coffee params.")
-                    return _end(CoffeeMakerResult.CANNOT_SET_PARAM)
+                    return _end(CoffeeMakerResult.CANNOT_SET_PARAM, None)
                 self.__update_last_contact__()
                 self.__brewing_status__ = BrewingStatus(BrewingStage.PRESSING_BTN, None, None)
                 if self.jura.write_with_response(self.coffee_button_map[CoffeeType.COFFEE]) != "ok:":
                     logger.warning("Could not press button.")
-                    return _end(CoffeeMakerResult.CANNOT_PRESS_BTN)
+                    return _end(CoffeeMakerResult.CANNOT_PRESS_BTN, None)
                 self.__update_last_contact__()
                 self.__brewing_status__ = BrewingStatus(BrewingStage.BREWING, None, None)
                 # for robustness purposes the following design choices were made:
@@ -322,7 +322,7 @@ class CoffeeMaker:
                     except InvalidResponse as e:
                         logger.warning(f"Received invalid response: {e}.")
                 if prev_total_coffee is None:
-                    return _end(CoffeeMakerResult.CANNOT_GET_COFFEE_COUNT)
+                    return _end(CoffeeMakerResult.CANNOT_GET_COFFEE_COUNT, None)
                 end_detected = False
                 is_successfully_brewed_locked = False
                 is_successfully_brewed = False
@@ -415,13 +415,13 @@ class CoffeeMaker:
                     logger.warning(f"Coffee ending could not be detected.")
                 logger.debug(f"Coffee date {coffee_date}") # TODO return the date
                 return _end(CoffeeMakerResult.OK if is_successfully_brewed else
-                            CoffeeMakerResult.CANNOT_CONFIRM_SUCCESSFUL_COFFEE)
+                            CoffeeMakerResult.CANNOT_CONFIRM_SUCCESSFUL_COFFEE, coffee_date)
             except EmptyResponse:
                 logger.fatal(f"Received empty response while trying to brew_coffee.")
-                return _end(CoffeeMakerResult.CANNOT_COMMUNICATE)
+                return _end(CoffeeMakerResult.CANNOT_COMMUNICATE, None)
             except InvalidResponse as e:
                 logger.fatal(f"Received invalid response: {e} while trying to brew_coffee.")
-                return _end(CoffeeMakerResult.CANNOT_COMMUNICATE)
+                return _end(CoffeeMakerResult.CANNOT_COMMUNICATE, None)
 
         t = Thread(target=_exec)
         t.start()

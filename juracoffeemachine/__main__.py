@@ -3,6 +3,7 @@ import logging
 import sys
 import threading
 import time
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Callable
@@ -42,8 +43,8 @@ def interactive_brew(machin: CoffeeMaker):
                 stop.set()
             time.sleep(0.5)
 
-    def _cb(result: CoffeeMakerResult):
-        logger.info(f"Result is {result}")
+    def _cb(result: CoffeeMakerResult, date: datetime):
+        logger.info(f"Result is {result}: {date}")
         stop.set()
 
     t = threading.Thread(target=_exec)
