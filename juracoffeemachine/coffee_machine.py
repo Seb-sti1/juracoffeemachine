@@ -252,7 +252,7 @@ class CoffeeMaker:
         self.__brew_threads__.append(t)
 
     def brew_coffee(self, coffee_bean: int, water_volume: int,
-                    cb: Callable[[CoffeeMakerResult, datetime], None], stop: Optional[Event] = None):
+                    cb: Callable[[CoffeeMakerResult, Optional[datetime]], None], stop: Optional[Event] = None):
         """
         BE EXTREMELY CAREFUL WHEN USING THIS FUNCTION AS IT OVERWRITE DIRECTLY TO THE EEPROM!!!!!
 
@@ -262,7 +262,7 @@ class CoffeeMaker:
         :param cb: callback when it ends, returns if the coffee was brewed
         """
 
-        def _end(result: CoffeeMakerResult, date: datetime):
+        def _end(result: CoffeeMakerResult, date: Optional[datetime]):
             cb(result, date)
             self.__brewing_status__ = None
             self.__comm_lock__.release()
@@ -413,7 +413,7 @@ class CoffeeMaker:
                     logger.info(f"Coffee ending was properly detected.")
                 else:
                     logger.warning(f"Coffee ending could not be detected.")
-                logger.debug(f"Coffee date {coffee_date}") # TODO return the date
+                logger.debug(f"Coffee date {coffee_date}")
                 return _end(CoffeeMakerResult.OK if is_successfully_brewed else
                             CoffeeMakerResult.CANNOT_CONFIRM_SUCCESSFUL_COFFEE, coffee_date)
             except EmptyResponse:
