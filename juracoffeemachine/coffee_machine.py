@@ -53,6 +53,7 @@ class BrewingStage(IntEnum):
     SETTING_PARAM = 1
     PRESSING_BTN = 2
     BREWING = 3
+    ENDING = 4
 
 
 @dataclass
@@ -391,6 +392,7 @@ class CoffeeMaker:
                                                    all(v == last_water_sensor_values[0] for v in
                                                        last_water_sensor_values)
                                 if water_stabilized:
+                                    self.__brewing_status__.stage = BrewingStage.ENDING
                                     msg_type = JuraCommand.RE
                         elif msg_type == JuraCommand.RE:
                             # if stop was requested, send stop commands until the coffee is counted
