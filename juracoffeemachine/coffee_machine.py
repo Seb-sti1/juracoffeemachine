@@ -374,6 +374,7 @@ class CoffeeMaker:
                                 logging.info(f"Stop requested, coffee is considered successful.")
                                 is_successfully_brewed = True
                                 is_successfully_brewed_locked = True
+                                self.__brewing_status__.stage = BrewingStage.ENDING
                                 msg_type = JuraCommand.RE
                             # when a water_vol > 0 is read, the coffee is considered successful no matter what
                             if msg.water_vol > 0 and not is_successfully_brewed_locked:
