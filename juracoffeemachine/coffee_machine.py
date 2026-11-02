@@ -331,6 +331,7 @@ class CoffeeMaker:
                 coffee_date = None
                 # monitoring and improvements data
                 all_sensors_values = []
+                not_invalid_stop_request = 3
                 # timer
                 water_vol_reset_time = None
                 start_time = time.time()
@@ -397,10 +398,16 @@ class CoffeeMaker:
                                     msg_type = JuraCommand.RE
                         elif msg_type == JuraCommand.RE:
                             # if stop was requested, send stop commands until the coffee is counted
-                            if stop is not None and stop.is_set():
+                            if stop is not None and stop.is_set() and not_invalid_stop_request > 0:
                                 try:
-                                    if self.jura.write_with_response(JuraCommand.BUTTON_6) != "ok:":
+                                    if self.jura.write_with_response(JuraCommand.BUTTON_3) != "ok:":
                                         logger.warning(f"Stop request not okay.")
+                                    else:
+                                        # This does not necessarily mean that the jura performed the stop, just that it
+                                        # properly received the action to do. Therefore, it is tried 3 times.
+                                        # It is not tried until the coffee end is detected as otherwise it opens the
+                                        # maintenance menu right at the end.
+                                        not_invalid_stop_request -= 1
                                     self.__update_last_contact__()
                                 except EmptyResponse:
                                     logger.warning(f"Received empty response.")
